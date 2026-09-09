@@ -75,17 +75,6 @@ export default function Page() {
       <div className="row">
         <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
         <button disabled={busy} onClick={() => analyze(false)}>{busy ? "Running…" : "Analyze"}</button>
-        <button className="ghost" disabled={busy} onClick={() => analyze(true)}>Analyze + execute if gates pass</button>
-        <button className="ghost" disabled={busy} onClick={async () => {
-          setBusy(true);
-          await fetch("/api/monitor", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-          await refreshDesk();
-          setBusy(false);
-        }}>Monitor open</button>
-        <button className="ghost" onClick={async () => {
-          await fetch("/api/monitor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "flatten" }) });
-          await refreshDesk();
-        }}>Kill flatten</button>
         {error ? <span className="fail">{error}</span> : null}
       </div>
 
