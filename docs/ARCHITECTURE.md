@@ -63,7 +63,7 @@ Monitor · invalidate · review · memory
 | SEC company tickers + submissions | Company, SIC, filings 10-K/10-Q/8-K | Public, User-Agent required |
 | Google News RSS | Headlines with publisher + time | Public |
 | Finnhub / NewsAPI | Optional if keys set | Optional |
-| SpaceXAI | Elder debate, NL answers grounded in run state | `XAI_API_KEY` |
+| OpenAI / Anthropic | Elder debate, NL answers grounded in run state | `LLM_PROVIDER` + provider key |
 
 Missing critical data → **NO TRADE**, never a fabricated substitute.
 
@@ -90,6 +90,12 @@ calibrated = raw + completeness + conflict + session + sample-size penalties
 ```
 
 Every negative adjustment is stored and shown.
+
+## After the fill
+
+`tickMonitor` re-reads mark, 1H close, spread, ATR. Deterministic actions: HOLD, CLOSE (TP/SL/invalidation), or KILL_FLATTEN. Close persists a settled trade + self-review. Similar setups never quote a win rate below 30 settled samples. `paper-loop` repeats analyze→execute→monitor for the competition log.
+
+Kill switch state lives in `data/killswitch.json`. The LLM cannot reset it; only `npm run monitor reset` or the desk flatten/reset endpoints.
 
 ## Execution contract
 

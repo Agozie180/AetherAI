@@ -190,13 +190,94 @@ export interface ExecutionReceipt {
   clientOid: string;
   takeProfit?: string;
   stopLoss?: string;
+  fillPrice?: number;
+  fillQty?: number;
+  orderStatus?: string;
+  positionConfirmed?: boolean;
+  leverageSet?: string;
   raw?: unknown;
   error?: string;
   submittedAt: string;
+  confirmedAt?: string;
 }
+
+export interface OpenPosition {
+  id: string;
+  runId: string;
+  symbol: string;
+  direction: Exclude<Vote, "NO_TRADE">;
+  qty: number;
+  entry: number;
+  stop: number;
+  takeProfit: number;
+  invalidation: string;
+  invalidationPrice: number;
+  leverage: number;
+  simulated: boolean;
+  mode: Mode | "simulated";
+  orderId?: string;
+  clientOid: string;
+  openedAt: string;
+  thesis: string;
+  regime: string;
+  session: SessionId;
+  calibrated: number;
+  elders: { elder: string; vote: Vote }[];
+  status: "open" | "closing" | "closed";
+}
+
+export interface SettledTrade extends OpenPosition {
+  closedAt: string;
+  exit: number;
+  exitReason: string;
+  rMultiple: number;
+  pnlUsd: number;
+  durationMs: number;
+  closeOrderId?: string;
+  closeSimulated: boolean;
+}
+
+export interface TradeReview {
+  tradeId: string;
+  symbol: string;
+  at: string;
+  thesisCorrect: boolean | "unknown";
+  directionCorrect: boolean;
+  confidenceCalibrated: "over" | "under" | "ok" | "insufficient_sample";
+  eldersRight: string[];
+  eldersWrong: string[];
+  regimeChanged: boolean;
+  catalystNote: string;
+  microstructureNote: string;
+  tpslReasonable: boolean;
+  executionNote: string;
+  nextTime: string;
+  rMultiple: number;
+  sampleSize: number;
+}
+
+export interface KillState {
+  tripped: boolean;
+  paused: boolean;
+  reasons: string[];
+  at?: string;
+  flattenAttempts: number;
+  failedOrders: number;
+}
+
+export type MonitorAction = "HOLD" | "CLOSE" | "KILL_FLATTEN";
 
 export interface RunRequest {
   symbol?: string;
   mode?: Mode;
   execute?: boolean;
+}
+
+export interface ResearchAsset {
+  ticker: string;
+  name: string;
+  cik: number;
+  exchange?: string;
+  tradableOnBitget: boolean;
+  reason: string;
 }

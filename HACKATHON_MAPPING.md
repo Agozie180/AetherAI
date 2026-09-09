@@ -66,7 +66,7 @@ Handbook scoring: **50% quantitative + 50% judge**.
 | Agent Hub / `bitget-agent-sdk` | Optional later; first-party REST is the source of truth |
 | `bitget-signal` skills | Perception inspiration; we reimplement research with cited sources so the desk is inspectable without MCP |
 | Playbook | Not required for Agentic Trading |
-| SpaceXAI (`XAI_API_KEY`, `https://api.x.ai/v1`, `grok-4.6`) | Elders + NL desk. Deterministic fallback if no key |
+| OpenAI / Anthropic (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) | Elders + NL desk. Deterministic fallback if no provider key |
 
 ## Submission checklist (disqualifiers)
 

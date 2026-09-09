@@ -2,7 +2,7 @@ import { policy } from "../policy";
 import type { Mode, RunRequest, Vote } from "../types";
 import { nowIso, uid } from "../util";
 import { bitgetConfigFromEnv, bitgetMode } from "../bitget/client";
-import { loadInstruments, resolveInstrument } from "../bitget/instruments";
+import { resolveInstrument } from "../bitget/instruments";
 import { fetchCandles, fetchMarketBundle, fetchTicker } from "../bitget/market";
 import { runResearch } from "../research/engine";
 import { technicalSnapshot } from "../intelligence/technicals";
@@ -19,18 +19,34 @@ import { councilGate } from "../council/gate";
 import { planRisk } from "../risk/engine";
 import { evaluateKillSwitch } from "../risk/killswitch";
 import { executionSafety, placeFuturesOrder } from "../execution/safety";
-import { appendPaperLog, saveRun, similarSetupCount } from "../memory/store";
+import { confirmFill } from "../execution/confirm";
+import { fetchAccount } from "../bitget/account";
+import {
+  appendPaperLog,
+  appendEvent,
+  bumpFailedOrders,
+  getOpenBySymbol,
+  tripKill,
+  loadKill,
+  loadPositions,
+  realizedLossUsd,
+  saveRun,
+  upsertPosition,
+} from "../memory/store";
+import { similarSetups } from "../memory/similar";
 import { foldGates, gate } from "./gates";
 
 export async function runAether(req: RunRequest = {}) {
   const started = Date.now();
-  const mode: Mode = (req.mode || (process.env.AETHER_MODE as Mode) || "paper") as Mode;
+  const configuredMode = String(process.env.AETHER_MODE || "paper").toLowerCase();
+  const mode: Mode = configuredMode === "live" || configuredMode === "paused" ? configuredMode : "paper";
   const cfg = bitgetConfigFromEnv();
   const bitget = bitgetMode(cfg);
   const session = currentSession();
   const runId = uid("run");
 
-  const { futures } = await loadInstruments();
+  const killState = loadKill();
+  const account = await fetchAccount(cfg);
   const requested = (req.symbol || "NVDAUSDT").toUpperCase();
   const resolved = await resolveInstrument(requested);
 
@@ -42,6 +58,7 @@ export async function runAether(req: RunRequest = {}) {
       bitget,
       session,
       resolved,
+      researchAsset: resolved.researchAsset,
       decision: "NO_TRADE",
       reason: resolved.reason,
       gates: [gate("instrument", false, resolved.reason)],
@@ -96,7 +113,11 @@ export async function runAether(req: RunRequest = {}) {
     volumeVsBaseline: technicals.volumeRatio,
   });
 
-  const history = similarSetupCount();
+  const history = similarSetups({
+    regime: regime.regime,
+    session: session.session,
+    direction: mtf.consensus,
+  });
   const confidence = computeConfidence({
     mtf,
     regime,
@@ -109,7 +130,7 @@ export async function runAether(req: RunRequest = {}) {
     psychology,
     session: session.session,
     quality: research.quality,
-    sampleTrades: history.similar,
+    sampleTrades: history.settled,
   });
 
   const thesis = {
@@ -157,6 +178,8 @@ export async function runAether(req: RunRequest = {}) {
   const council = councilGate(elders);
 
   const staleMs = Date.now() - market.fetchedAt;
+  const existing = getOpenBySymbol(inst.symbol);
+  const openCount = loadPositions().length;
   const kill = evaluateKillSwitch({
     apiFailures: research.quality.failures.length,
     staleMarketMs: staleMs,
@@ -164,16 +187,17 @@ export async function runAether(req: RunRequest = {}) {
     maxSpreadBps: policy.maxSpreadBps,
     maxStaleMs: policy.maxStaleMarketMs,
     atrShock: regime.atrPct > 0.05,
-    realizedLossUsd: 0,
+    realizedLossUsd: realizedLossUsd(),
     lossLimitUsd: policy.killSwitchLossUsd,
-    failedOrders: 0,
+    failedOrders: killState.failedOrders,
   });
+  if (kill.tripped) tripKill(kill.reasons);
 
   const risk = planRisk({
     instrument: inst,
     last: market.ticker.last,
     vote: council.passed ? council.consensus : "NO_TRADE",
-    equityUsd: 10_000,
+    equityUsd: account.equityUsd || Number(process.env.AETHER_PAPER_EQUITY || 10_000),
     technicals,
     structure,
     micro,
@@ -185,6 +209,8 @@ export async function runAether(req: RunRequest = {}) {
 
   const sessionPass = confidence.calibrated >= session.threshold;
   const gates = [
+    gate("execution_mode", mode === "live" ? bitget === "live" : mode === "paper" ? bitget !== "live" : true, `configured=${mode}, exchange=${bitget}`),
+    gate("account_mode", mode !== "live" || (account.source === "bitget" && !account.simulated), account.error || `account source=${account.source}`),
     gate("market_data", staleMs <= policy.maxStaleMarketMs, `staleness ${staleMs}ms`),
     gate("research", research.quality.failures.filter((f) => f.startsWith("SEC:") && f.includes("HTTP 5")).length === 0, research.quality.failures[0] ?? "research fetched"),
     gate("instrument", resolved.tradableFutures, resolved.reason),
@@ -195,7 +221,9 @@ export async function runAether(req: RunRequest = {}) {
     gate("confidence", sessionPass, `calibrated ${(confidence.calibrated * 100).toFixed(1)}% vs session ${(session.threshold * 100).toFixed(0)}%`),
     gate("session", sessionPass, `${session.label} threshold ${(session.threshold * 100).toFixed(0)}%`),
     gate("council", council.passed, council.summary),
-    gate("kill_switch", !kill.tripped, kill.reasons.join("; ") || "clear"),
+    gate("kill_switch", !kill.tripped && !killState.tripped, kill.reasons.join("; ") || killState.reasons.join("; ") || "clear"),
+    gate("existing_position", !existing, existing ? `Already in ${inst.symbol}` : "flat"),
+    gate("exposure", openCount < policy.maxConcurrentPositions, `open ${openCount}/${policy.maxConcurrentPositions}`),
     gate("risk", risk.allowed, risk.reason),
     gate("expected_value", risk.estimatedEv > 0, `EV ${risk.estimatedEv}`),
   ];
@@ -212,7 +240,8 @@ export async function runAether(req: RunRequest = {}) {
   gates.push(gate("execution_safety", safety.passed, safety.steps.filter((s) => !s.ok).map((s) => s.name).join(",") || "ok"));
 
   const folded = foldGates(gates);
-  const shouldExecute = Boolean(req.execute) && folded.passed && mode !== "paused";
+  const shouldExecute =
+    Boolean(req.execute) && folded.passed && mode !== "paused" && !killState.tripped && !kill.tripped;
   let execution = null;
   if (shouldExecute && council.consensus !== "NO_TRADE") {
     execution = await placeFuturesOrder({
@@ -223,6 +252,43 @@ export async function runAether(req: RunRequest = {}) {
       execute: true,
       mode,
     });
+    if (execution.error) bumpFailedOrders();
+    else {
+      execution = await confirmFill({
+        receipt: execution,
+        mark: market.ticker.last,
+        qty: risk.qty,
+        cfg,
+      });
+      if (execution.error) bumpFailedOrders();
+      else if (council.consensus === "LONG" || council.consensus === "SHORT") {
+        upsertPosition({
+          id: uid("pos"),
+          runId,
+          symbol: inst.symbol,
+          direction: council.consensus,
+          qty: execution.fillQty || risk.qty,
+          entry: execution.fillPrice || market.ticker.last,
+          stop: risk.stop,
+          takeProfit: risk.takeProfit,
+          invalidation: risk.invalidation,
+          invalidationPrice: council.consensus === "LONG" ? structure.support : structure.resistance,
+          leverage: risk.leverage,
+          simulated: execution.simulated,
+          mode: execution.simulated ? "simulated" : mode,
+          orderId: execution.orderId,
+          clientOid: execution.clientOid,
+          openedAt: nowIso(),
+          thesis: thesis.text,
+          regime: regime.regime,
+          session: session.session,
+          calibrated: confidence.calibrated,
+          elders: elders.map((e) => ({ elder: e.elder, vote: e.vote })),
+          status: "open",
+        });
+        appendEvent({ type: "OPEN", symbol: inst.symbol, execution });
+      }
+    }
   } else if (folded.passed && council.consensus !== "NO_TRADE") {
     execution = await placeFuturesOrder({
       cfg,
@@ -270,6 +336,8 @@ export async function runAether(req: RunRequest = {}) {
     decision,
     noTradeReason,
     execution,
+    account,
+    openCount,
     history,
     policy: {
       maxLeverage: policy.maxLeverage,

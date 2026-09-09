@@ -53,6 +53,10 @@ export async function lookupSecCompany(ticker: string): Promise<SecCompany | und
   return map.get(ticker.toUpperCase());
 }
 
+export async function listSecCompanies(): Promise<SecCompany[]> {
+  return [...(await loadSecTickers()).values()].sort((a, b) => a.ticker.localeCompare(b.ticker));
+}
+
 function cikPad(cik: number): string {
   return String(cik).padStart(10, "0");
 }

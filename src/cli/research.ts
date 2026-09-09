@@ -4,6 +4,7 @@ loadDotEnv();
 import { resolveInstrument } from "../lib/bitget/instruments";
 import { fetchTicker } from "../lib/bitget/market";
 import { runResearch } from "../lib/research/engine";
+import { fetchSecResearch } from "../lib/research/sec";
 
 async function main() {
   const symbol = (process.argv[2] || "NVDAUSDT").toUpperCase();
@@ -17,6 +18,8 @@ async function main() {
     capability: resolved.capability,
   } }, null, 2));
   if (!resolved.futures) {
+    const ticker = symbol.replace(/USDT$/i, "").replace(/^R/i, "");
+    console.log(JSON.stringify({ researchOnly: true, sec: await fetchSecResearch(ticker) }, null, 2));
     process.exitCode = 2;
     return;
   }

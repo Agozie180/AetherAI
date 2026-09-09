@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAether } from "@/lib/orchestrator/run";
 import type { Mode } from "@/lib/types";
+import { requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,10 @@ export const maxDuration = 120;
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as { symbol?: string; execute?: boolean; mode?: Mode };
+    if (body.execute) {
+      const denied = requireAdmin(req);
+      if (denied) return denied;
+    }
     const out = await runAether({
       symbol: body.symbol,
       execute: Boolean(body.execute),

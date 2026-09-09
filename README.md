@@ -29,6 +29,10 @@ npm test
 npm run discover
 npm run research -- NVDAUSDT
 npm run run -- NVDAUSDT
+npm run monitor
+npm run monitor flatten
+npm run paper-loop -- --once
+npm run paper-loop
 npm run dev
 ```
 
@@ -64,7 +68,8 @@ Policy (session 65% off / 70% London, max 5x leverage, 4/7 quorum) lives in **on
 | Env | Required? |
 | --- | --- |
 | none | Public market + SEC + RSS research still works |
-| `XAI_API_KEY` | SpaceXAI (`https://api.x.ai/v1`, model `grok-4.6`) for elders + NL desk |
+| `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | Configure `LLM_PROVIDER` and `LLM_MODEL` for elders + NL desk |
+| `AETHER_ADMIN_TOKEN` | Required bearer token for execution, flatten, and kill-switch reset |
 | `BITGET_API_KEY` + secret + passphrase | Demo/live orders. Set `BITGET_PAPER=1` for Demo (`paptrading: 1`) |
 | `FINNHUB_API_KEY` / `NEWSAPI_KEY` | Optional extra news |
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Run = Record<string, any>;
 
@@ -11,6 +11,13 @@ export default function Page() {
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("Why didn't you trade?");
   const [answer, setAnswer] = useState("");
+  const [desk, setDesk] = useState<Record<string, any> | null>(null);
+
+  async function refreshDesk() {
+    const res = await fetch("/api/state");
+    const json = await res.json();
+    if (json.ok) setDesk(json);
+  }
 
   async function analyze(execute = false) {
     setBusy(true);
@@ -24,6 +31,7 @@ export default function Page() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "run failed");
       setRun(json.run);
+      await refreshDesk();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -48,6 +56,7 @@ export default function Page() {
   const adj = (run?.confidence?.adjustments ?? []) as { name: string; delta: number; reason: string }[];
 
   const status = useMemo(() => (run?.decision === "NO TRADE" ? "fail" : "pass"), [run]);
+  useEffect(() => { void refreshDesk(); }, []);
 
   return (
     <main className="app">
@@ -58,6 +67,7 @@ export default function Page() {
         </div>
         <div>
           <span className={`badge ${mode === "LIVE" ? "live" : "paper"}`}>{mode} MODE</span>
+          <span className={`badge ${desk?.kill?.tripped ? "live" : "paper"}`}>{desk?.kill?.tripped ? "KILL TRIPPED" : "KILL CLEAR"}</span>
           <span className="badge">{run?.session?.label ?? "SESSION n/a"}</span>
         </div>
       </header>
@@ -66,6 +76,16 @@ export default function Page() {
         <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
         <button disabled={busy} onClick={() => analyze(false)}>{busy ? "Running…" : "Analyze"}</button>
         <button className="ghost" disabled={busy} onClick={() => analyze(true)}>Analyze + execute if gates pass</button>
+        <button className="ghost" disabled={busy} onClick={async () => {
+          setBusy(true);
+          await fetch("/api/monitor", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+          await refreshDesk();
+          setBusy(false);
+        }}>Monitor open</button>
+        <button className="ghost" onClick={async () => {
+          await fetch("/api/monitor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "flatten" }) });
+          await refreshDesk();
+        }}>Kill flatten</button>
         {error ? <span className="fail">{error}</span> : null}
       </div>
 
@@ -160,6 +180,25 @@ export default function Page() {
           </div>
         </div>
 
+        <div className="panel">
+          <h2>Open positions</h2>
+          {(desk?.open ?? []).length === 0 ? <p className="item">Flat.</p> : (desk?.open ?? []).map((p: any) => (
+            <div className="item" key={p.id}>
+              {p.symbol} {p.direction} @ {p.entry} {p.simulated ? "SIMULATED" : p.orderId}
+              <small>SL {p.stop} TP {p.takeProfit} · {p.thesis}</small>
+            </div>
+          ))}
+        </div>
+        <div className="panel">
+          <h2>Self-review / memory</h2>
+          <p>{desk?.similar?.note ?? "No settled sample."}</p>
+          {(desk?.reviews ?? []).slice(0, 4).map((r: any) => (
+            <div className="item" key={r.tradeId}>
+              {r.symbol} {r.directionCorrect ? "direction ok" : "direction wrong"} · {r.rMultiple?.toFixed?.(2)}R
+              <small>{r.nextTime} · sample {r.sampleSize} · {r.confidenceCalibrated}</small>
+            </div>
+          ))}
+        </div>
         <div className="panel span2">
           <h2>Ask the desk</h2>
           <div className="row">

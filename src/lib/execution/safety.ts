@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ExecutionReceipt, Instrument, Mode, Vote } from "../types";
 import { nowIso } from "../util";
 import { bitgetMode, bitgetPost, type BitgetConfig } from "../bitget/client";
+import { setLeverage } from "../bitget/account";
 import type { RiskPlan } from "../risk/engine";
 
 export interface SafetyCheck {
@@ -80,6 +81,30 @@ export async function placeFuturesOrder(args: {
     };
   }
 
+  const lev = await setLeverage({
+    symbol: args.instrument.symbol,
+    leverage: args.plan.leverage,
+    marginMode: "isolated",
+    posSide,
+    cfg: args.cfg,
+  });
+  if (!lev.ok) {
+    return {
+      mode: args.mode,
+      simulated: false,
+      symbol: args.instrument.symbol,
+      side,
+      orderType: "market",
+      qty: body.qty,
+      clientOid,
+      takeProfit: body.takeProfit,
+      stopLoss: body.stopLoss,
+      leverageSet: lev.detail,
+      submittedAt: nowIso(),
+      error: `Leverage was not confirmed: ${lev.detail}`,
+    };
+  }
+
   const mode = bitgetMode(args.cfg);
   if (mode === "public") {
     return {
@@ -92,8 +117,9 @@ export async function placeFuturesOrder(args: {
       clientOid,
       takeProfit: body.takeProfit,
       stopLoss: body.stopLoss,
+      leverageSet: lev.detail,
       submittedAt: nowIso(),
-      raw: { note: "No Bitget API keys. Local simulation only. NOT a live or demo fill." },
+      raw: { note: "No Bitget API keys. Local simulation only. NOT a live or demo fill.", leverage: lev },
     };
   }
 
@@ -114,6 +140,7 @@ export async function placeFuturesOrder(args: {
       clientOid: data.clientOid || clientOid,
       takeProfit: body.takeProfit,
       stopLoss: body.stopLoss,
+      leverageSet: lev.detail,
       raw: data,
       submittedAt: nowIso(),
     };

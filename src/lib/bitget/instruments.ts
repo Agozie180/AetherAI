@@ -1,6 +1,8 @@
 import type { Instrument, SymbolType } from "../types";
 import { num } from "../util";
 import { bitgetGet } from "./client";
+import { lookupSecCompany } from "../research/sec";
+import type { ResearchAsset } from "../types";
 
 interface RawInstrument {
   symbol: string;
@@ -109,6 +111,7 @@ export interface InstrumentResolution {
   tradableFutures: boolean;
   reason: string;
   capability: "AVAILABLE" | "UNAVAILABLE";
+  researchAsset?: ResearchAsset;
 }
 
 export async function resolveInstrument(symbol: string): Promise<InstrumentResolution> {
@@ -146,6 +149,17 @@ export async function resolveInstrument(symbol: string): Promise<InstrumentResol
       tradableFutures: false,
       reason: `${rspot.symbol} is Reality/rToken SPOT. There is no matching futures contract for this symbol. Do not fake a perp.`,
       capability: "UNAVAILABLE",
+    };
+  }
+  const ticker = u.replace(/USDT$/i, "").replace(/^R/i, "");
+  const company = await lookupSecCompany(ticker).catch(() => undefined);
+  if (company) {
+    return {
+      requested: u,
+      tradableFutures: false,
+      reason: `${ticker} is a verified SEC-listed U.S. equity but has no live Bitget futures instrument. Research only; execution disabled.`,
+      capability: "UNAVAILABLE",
+      researchAsset: { ticker: company.ticker, name: company.name, cik: company.cik, tradableOnBitget: false, reason: "No matching Bitget USDT-FUTURES instrument." },
     };
   }
   return {
