@@ -1,0 +1,32 @@
+{
+  "name": "aetherai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AetherAI — autonomous agentic trading intelligence for Bitget AI Hackathon Season 2",
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "research": "tsx src/cli/research.ts",
+    "run": "tsx src/cli/run.ts",
+    "discover": "tsx src/cli/discover.ts"
+  },
+  "dependencies": {
+    "next": "^15.5.2",
+    "openai": "^5.16.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
