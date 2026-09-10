@@ -11,7 +11,7 @@ const baseMtf: MtfSnapshot = {
   consensus: "LONG",
 };
 
-const quality: DataQuality = { complete: true, missing: [], stale: [], failures: [], freshnessSeconds: {} };
+const quality: DataQuality = { complete: true, missing: [], stale: [], failures: [], freshnessSeconds: {}, freshSubstantive: 3 };
 
 function stub(over: Record<string, unknown> = {}) {
   return computeConfidence({
@@ -43,7 +43,7 @@ function stub(over: Record<string, unknown> = {}) {
 describe("confidence", () => {
   it("never lets hidden negative adjustments disappear", () => {
     const c = stub({
-      quality: { complete: false, missing: ["news_headlines"], stale: [], failures: ["SEC: down"], freshnessSeconds: {} },
+      quality: { complete: false, missing: ["news_headlines"], stale: [], failures: ["SEC: down"], freshnessSeconds: {}, freshSubstantive: 0 },
       mtf: { ...baseMtf, conflict: true, confluence: 0.5, consensus: "LONG" },
       sampleTrades: 3,
     });
@@ -56,5 +56,34 @@ describe("confidence", () => {
     const a = stub();
     const b = stub();
     expect(a.raw).toBeCloseTo(b.raw, 8);
+  });
+
+  it("credits a proven historical edge only once the sample is large enough", () => {
+    // Small sample: sample_size penalty, never a historical_edge credit.
+    const small = stub({ sampleTrades: 10, historicalWinRate: 0.9 });
+    expect(small.adjustments.find((a) => a.name === "historical_edge")).toBeUndefined();
+    expect(small.adjustments.find((a) => a.name === "sample_size")).toBeDefined();
+
+    // Large sample, winning edge: bounded positive adjustment, no penalty.
+    const winning = stub({ sampleTrades: 40, historicalWinRate: 0.72 });
+    const up = winning.adjustments.find((a) => a.name === "historical_edge");
+    expect(up).toBeDefined();
+    expect(up!.delta).toBeGreaterThan(0);
+    expect(up!.delta).toBeLessThanOrEqual(0.08);
+    expect(winning.adjustments.find((a) => a.name === "sample_size")).toBeUndefined();
+
+    // Large sample, losing edge: negative, bounded, and it drags calibrated < raw.
+    const losing = stub({ sampleTrades: 40, historicalWinRate: 0.28 });
+    const down = losing.adjustments.find((a) => a.name === "historical_edge");
+    expect(down).toBeDefined();
+    expect(down!.delta).toBeLessThan(0);
+    expect(down!.delta).toBeGreaterThanOrEqual(-0.08);
+  });
+
+  it("stays backward-compatible when no win rate is supplied", () => {
+    // Large sample but no historicalWinRate: neither penalty nor credit.
+    const c = stub({ sampleTrades: 40 });
+    expect(c.adjustments.find((a) => a.name === "historical_edge")).toBeUndefined();
+    expect(c.adjustments.find((a) => a.name === "sample_size")).toBeUndefined();
   });
 });

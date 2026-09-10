@@ -1,3 +1,4 @@
+import { policy } from "../policy";
 import type { DataQuality, Instrument, ResearchItem, Ticker } from "../types";
 import { nowIso, uid } from "../util";
 import { classifyCatalyst, type CatalystReport } from "./catalyst";
@@ -86,12 +87,16 @@ export async function runResearch(args: {
     notes.push("Bitget lists a stock perp but SEC has no CIK for this ticker — treat issuer research as incomplete.");
   }
 
+  const isFresh = (i: ResearchItem): boolean =>
+    i.kind === "company" || i.freshnessMinutes <= policy.maxStaleResearchMin;
+
   const quality: DataQuality = {
     complete: missing.length === 0 && failures.filter((f) => f.startsWith("SEC")).length === 0,
     missing,
-    stale: items.filter((i) => i.freshnessMinutes > 24 * 60 && i.kind !== "company").map((i) => i.id),
+    stale: items.filter((i) => !isFresh(i) && i.kind !== "company").map((i) => i.id),
     failures,
     freshnessSeconds,
+    freshSubstantive: items.filter((i) => i.kind !== "price" && isFresh(i)).length,
   };
 
   return {

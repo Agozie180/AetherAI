@@ -99,6 +99,11 @@ export interface DataQuality {
   stale: string[];
   failures: string[];
   freshnessSeconds: Record<string, number>;
+  /** Count of non-price research items that are still fresh (company anchors
+   *  are always fresh; everything else must be within policy.maxStaleResearchMin).
+   *  The research gate requires this to be > 0 so a decision is never backed by
+   *  price action alone. */
+  freshSubstantive: number;
 }
 
 export interface Candle {

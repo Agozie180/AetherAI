@@ -63,7 +63,7 @@ Handbook scoring: **50% quantitative + 50% judge**.
 | --- | --- |
 | UTA v3 REST | Market data, instruments, orders, leverage, positions |
 | Bitget Demo (`paptrading: 1`) | Paper execution |
-| Agent Hub / `bitget-agent-sdk` | Optional later; first-party REST is the source of truth |
+| Agent Hub / `bitget-agent-sdk` | Not a dependency — we call UTA v3 REST directly so every request is inspectable. The SDK can wrap this later without changing the desk. |
 | `bitget-signal` skills | Perception inspiration; we reimplement research with cited sources so the desk is inspectable without MCP |
 | Playbook | Not required for Agentic Trading |
 | OpenAI / Anthropic (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) | Elders + NL desk. Deterministic fallback if no provider key |

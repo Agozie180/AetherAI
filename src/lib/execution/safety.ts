@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { ExecutionReceipt, Instrument, Mode, Vote } from "../types";
 import { nowIso } from "../util";
+import { policy } from "../policy";
 import { bitgetMode, bitgetPost, type BitgetConfig } from "../bitget/client";
 import { setLeverage } from "../bitget/account";
 import type { RiskPlan } from "../risk/engine";
@@ -26,7 +27,7 @@ export function executionSafety(args: {
       ok: args.tradableFutures,
       detail: args.tradableFutures ? "stock/crypto perp online" : "no futures instrument",
     },
-    { name: "leverage", ok: args.plan.leverage <= 5, detail: `leverage ${args.plan.leverage}` },
+    { name: "leverage", ok: args.plan.leverage <= policy.maxLeverage, detail: `leverage ${args.plan.leverage} (max ${policy.maxLeverage})` },
     { name: "qty", ok: args.plan.qty > 0, detail: String(args.plan.qty) },
     { name: "tpsl", ok: args.plan.stop > 0 && args.plan.takeProfit > 0, detail: `SL ${args.plan.stop} TP ${args.plan.takeProfit}` },
     { name: "freshness", ok: args.staleMs <= args.maxStaleMs, detail: `${args.staleMs}ms` },
@@ -44,8 +45,14 @@ export async function placeFuturesOrder(args: {
   plan: RiskPlan;
   execute: boolean;
   mode: Mode;
+  runId?: string;
 }): Promise<ExecutionReceipt> {
-  const clientOid = `ae${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  // Derive the clientOid from the run id so a retried run reuses the same id and
+  // the exchange rejects the duplicate instead of opening a second position.
+  // Fall back to a random id only when no run id is supplied (e.g. ad-hoc call).
+  const clientOid = args.runId
+    ? `ae${createHash("sha256").update(args.runId).digest("hex").slice(0, 16)}`
+    : `ae${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const side = args.vote === "SHORT" ? "sell" : "buy";
   const posSide = args.vote === "SHORT" ? "short" : "long";
   const body = {
