@@ -25,6 +25,9 @@ export function computeConfidence(input: {
   session: SessionId;
   quality: DataQuality;
   sampleTrades: number;
+  /** Realized win rate (0..1) of similar historical setups. Only supplied — and
+   *  only trusted — once the settled sample is large enough (>= 30). */
+  historicalWinRate?: number;
 }): ConfidenceTrace {
   const w = policy.confidenceWeights;
   const mtfScore =
@@ -98,6 +101,17 @@ export function computeConfidence(input: {
       name: "sample_size",
       delta: -0.04,
       reason: `Historical sample ${input.sampleTrades} — not a proven edge.`,
+    });
+  } else if (typeof input.historicalWinRate === "number") {
+    // Sample is now statistically meaningful: let the realized win rate of
+    // similar setups feed back into confidence, bounded so a hot streak can
+    // never dominate the deterministic evidence. This closes the loop the
+    // "self-improvement" logging was always writing toward.
+    const edge = clamp((input.historicalWinRate - 0.5) * 0.3, -0.08, 0.08);
+    adjustments.push({
+      name: "historical_edge",
+      delta: edge,
+      reason: `Win rate ${(input.historicalWinRate * 100).toFixed(0)}% over ${input.sampleTrades} similar settled trades.`,
     });
   }
   if (input.regime.regime === "choppy") {

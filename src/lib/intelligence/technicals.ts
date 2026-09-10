@@ -56,8 +56,15 @@ export function atr(candles: Candle[], period = 14): number {
     const prev = candles[i - 1].close;
     trs.push(Math.max(c.high - c.low, Math.abs(c.high - prev), Math.abs(c.low - prev)));
   }
-  const slice = trs.slice(-period);
-  return mean(slice);
+  if (trs.length < period) return mean(trs);
+  // Wilder smoothing (RMA): seed with the SMA of the first `period` true ranges,
+  // then fold in each later TR. This is the same smoothing rsi() uses, so the
+  // two indicators are now internally consistent.
+  let a = mean(trs.slice(0, period));
+  for (let i = period; i < trs.length; i++) {
+    a = (a * (period - 1) + trs[i]) / period;
+  }
+  return a;
 }
 
 export function bollinger(values: number[], period = 20, k = 2): {

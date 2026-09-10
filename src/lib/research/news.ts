@@ -24,7 +24,7 @@ export async function fetchNewsResearch(query: string, ticker: string): Promise<
     seen.add(key);
     deduped.push(it);
   }
-  return { items: deduped.slice(0, 20), errors: errors.concat(items.flatMap(() => [])).filter(Boolean) };
+  return { items: deduped.slice(0, 20), errors: errors.filter(Boolean) };
 }
 
 async function googleNewsRss(query: string, ticker: string): Promise<{ items: ResearchItem[] }> {

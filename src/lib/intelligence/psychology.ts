@@ -1,4 +1,5 @@
 import type { Psychology } from "../types";
+import { clamp } from "../util";
 
 export interface PsychologySnapshot {
   state: Psychology;
@@ -20,6 +21,9 @@ export function psychologySnapshot(args: {
   score += change24h * 80;
   score += (imbalance - 0.5) * 20;
   if (volumeRatio > 1.8) score += change24h > 0 ? 6 : -6;
+  // The terms above are individually unbounded (funding and 24h change have no
+  // fixed range), so pin the sentiment score to a real 0..100 scale.
+  score = clamp(score, 0, 100);
 
   let state: Psychology = "neutral";
   let rationale = "Balanced RSI/funding/flow.";

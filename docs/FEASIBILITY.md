@@ -29,7 +29,7 @@ Official S2 tip: Agentic Trading on an Agentic account via Agent Hub Tools + MCP
 
 | Fact | Value | Class |
 | --- | --- | --- |
-| USDT-FUTURES count | 783 | AVAILABLE |
+| USDT-FUTURES count | 787 | AVAILABLE |
 | `symbolType=stock` | **300, all online** | AVAILABLE |
 | Stock perps | `NVDAUSDT`, `AAPLUSDT`, `TSLAUSDT`, `SPYUSDT`, … | AVAILABLE |
 | rToken spot | `RAAPLUSDT`, `RNVDAUSDT` (`isReality=yes` on SPOT, 699) | AVAILABLE |
@@ -69,7 +69,7 @@ Bitget does **not** serve earnings, 10-Ks, or analyst notes. Those must come fro
 
 ## Policy mapping
 
-Spec “5% leverage” is **not** a Bitget field (min leverage is 1x). Internal policy: `maxLeverage = min(5, instrument.maxLeverage)` meaning **5x**, plus separate % equity risk for sizing.
+Spec “5% leverage” is **not** a Bitget field (min leverage is 1x). Internal policy: `leverage = clamp(min(policy.maxLeverage, instrument.maxLeverage))`, where `policy.maxLeverage` defaults to **5x** and is overridable via `AETHER_MAX_LEVERAGE`; the code and the execution-safety check read that single policy value (no hardcoded cap). Separate % equity risk drives sizing.
 
 ## Disqualifiers we refuse
 

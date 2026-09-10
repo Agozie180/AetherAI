@@ -131,6 +131,7 @@ export async function runAether(req: RunRequest = {}) {
     session: session.session,
     quality: research.quality,
     sampleTrades: history.settled,
+    historicalWinRate: history.settled >= 30 ? history.wins / history.settled : undefined,
   });
 
   const thesis = {
@@ -208,11 +209,18 @@ export async function runAether(req: RunRequest = {}) {
   });
 
   const sessionPass = confidence.calibrated >= session.threshold;
+  const secDown = research.quality.failures.some((f) => f.startsWith("SEC:") && f.includes("HTTP 5"));
+  const researchOk = !secDown && research.quality.freshSubstantive > 0;
+  const researchReason = secDown
+    ? research.quality.failures.find((f) => f.startsWith("SEC:") && f.includes("HTTP 5")) ?? "SEC upstream 5xx"
+    : research.quality.freshSubstantive > 0
+      ? `${research.quality.freshSubstantive} fresh sourced item(s)`
+      : "no fresh sourced research beyond price action";
   const gates = [
     gate("execution_mode", mode === "live" ? bitget === "live" : mode === "paper" ? bitget !== "live" : true, `configured=${mode}, exchange=${bitget}`),
     gate("account_mode", mode !== "live" || (account.source === "bitget" && !account.simulated), account.error || `account source=${account.source}`),
     gate("market_data", staleMs <= policy.maxStaleMarketMs, `staleness ${staleMs}ms`),
-    gate("research", research.quality.failures.filter((f) => f.startsWith("SEC:") && f.includes("HTTP 5")).length === 0, research.quality.failures[0] ?? "research fetched"),
+    gate("research", researchOk, researchReason),
     gate("instrument", resolved.tradableFutures, resolved.reason),
     gate("regime", regime.regime !== "choppy", `regime=${regime.regime}`),
     gate("mtf", mtf.consensus !== "NO_TRADE" && !mtf.conflict || mtf.confluence >= 0.6, `confluence=${mtf.confluence.toFixed(2)} consensus=${mtf.consensus}`),
@@ -251,6 +259,7 @@ export async function runAether(req: RunRequest = {}) {
       plan: risk,
       execute: true,
       mode,
+      runId,
     });
     if (execution.error) bumpFailedOrders();
     else {
@@ -297,6 +306,7 @@ export async function runAether(req: RunRequest = {}) {
       plan: risk,
       execute: false,
       mode,
+      runId,
     });
   }
 

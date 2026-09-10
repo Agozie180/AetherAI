@@ -11,7 +11,7 @@ If a capability is not on Bitget, the system says so. It does not invent endpoin
 | Mode | Meaning |
 | --- | --- |
 | `paper` | Default. Bitget Demo if Demo keys exist (`BITGET_PAPER=1`). Otherwise local simulation labeled **SIMULATED**. |
-| `live` | Real UTA keys, `AETHER_MODE=live`. Still bounded by policy (max 5x, gates, kill switch). |
+| `live` | Real UTA keys, `AETHER_MODE=live`. Still bounded by policy (leverage cap `AETHER_MAX_LEVERAGE`, default 5x; gates; kill switch). |
 | `paused` | Observe and research only. No orders. |
 
 The UI badge is always visible. Simulation is never called a live trade.
@@ -93,9 +93,9 @@ Every negative adjustment is stored and shown.
 
 ## After the fill
 
-`tickMonitor` re-reads mark, 1H close, spread, ATR. Deterministic actions: HOLD, CLOSE (TP/SL/invalidation), or KILL_FLATTEN. Close persists a settled trade + self-review. Similar setups never quote a win rate below 30 settled samples. `paper-loop` repeats analyze→execute→monitor for the competition log.
+`tickMonitor` re-reads mark, 1H close, spread, ATR. Deterministic actions: HOLD, CLOSE (TP/SL/invalidation), or KILL_FLATTEN. Close persists a settled trade + self-review. Similar setups never quote a win rate below 30 settled samples; once the sample clears 30, that realized win rate feeds back into confidence as a bounded `historical_edge` adjustment. `paper-loop` repeats analyze→execute→monitor for the competition log.
 
-Kill switch state lives in `data/killswitch.json`. The LLM cannot reset it; only `npm run monitor reset` or the desk flatten/reset endpoints.
+Kill switch state lives in the `killswitch` row of `data/aether.db` (SQLite). The LLM cannot reset it; only `npm run monitor reset` or the desk flatten/reset endpoints.
 
 ## Execution contract
 
@@ -113,5 +113,6 @@ Preset Bitget TP/SL: one each. Additional targets are explicit reduce-only actio
 
 ## Persistence
 
-`data/aether.db` (Node `node:sqlite`) and `data/paper-log.jsonl`.  
-Schema: runs, research_items, elder_votes, gates, orders, reviews.
+`data/aether.db` (Node `node:sqlite`, WAL mode) and the human-readable `data/paper-log.jsonl`.  
+Each run is stored whole in `runs.payload` and fanned out into normalized child tables so history is queryable: `runs`, `research_items`, `elder_votes`, `gates`, `orders`. Operational state lives in `positions`, `settled`, `reviews`, `events`, and the single-row `killswitch`.  
+On first open, any pre-existing legacy JSONL/JSON files (`runs.jsonl`, `positions.json`, `settled.jsonl`, `reviews.jsonl`, `events.jsonl`, `killswitch.json`) are migrated in once.

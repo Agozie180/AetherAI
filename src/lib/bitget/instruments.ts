@@ -96,7 +96,14 @@ export function realitySpot(all: Instrument[]): Instrument[] {
 
 export function findFutures(all: Instrument[], symbol: string): Instrument | undefined {
   const u = symbol.toUpperCase();
-  return all.find((i) => i.category === "USDT-FUTURES" && i.symbol.toUpperCase() === u);
+  const exact = all.find((i) => i.category === "USDT-FUTURES" && i.symbol.toUpperCase() === u);
+  if (exact) return exact;
+  // Bare ticker (e.g. "NVDA" or "BTC") → resolve to the USDT-margined perpetual
+  // symbol ("NVDAUSDT") instead of falling through to research-only.
+  if (!/USDT$/i.test(u)) {
+    return all.find((i) => i.category === "USDT-FUTURES" && i.symbol.toUpperCase() === `${u}USDT`);
+  }
+  return undefined;
 }
 
 export function findRealityPair(spot: Instrument[], base: string): Instrument | undefined {

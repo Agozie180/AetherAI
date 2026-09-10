@@ -43,9 +43,12 @@ export function planRisk(args: {
   const leverage = Math.max(instrument.minLeverage, Math.min(cap, policy.maxLeverage));
 
   const atrStop = args.technicals.atr * (args.regime.volatility === "high" ? 2.2 : 1.6);
+  // Structural stop distance: how far price sits from the level that would
+  // invalidate the trade (support for longs, resistance for shorts), floored by
+  // the ATR stop. Both branches are distances so downstream sizing is symmetric.
   const structStop =
     vote === "LONG"
-      ? last - args.structure.support * 0 + Math.max(last - args.structure.support, atrStop)
+      ? Math.max(last - args.structure.support, atrStop)
       : Math.max(args.structure.resistance - last, atrStop);
 
   const stopDist = Math.max(atrStop, structStop * 0.25, last * 0.004);
