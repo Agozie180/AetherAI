@@ -34,6 +34,7 @@ export function planRisk(args: {
   calibrated: number;
   fundingRate: number;
   feeRate: number;
+  availableUsdt?: number;
 }): RiskPlan {
   const { instrument, last, vote } = args;
   if (vote === "NO_TRADE" || last <= 0) {
@@ -71,6 +72,14 @@ export function planRisk(args: {
   let qty = Math.floor(qtyRaw / step) * step;
   qty = Math.max(instrument.minOrderQty, qty);
   const notional = qty * last;
+  const realizedRiskUsd = stopDist * qty;
+  if (realizedRiskUsd > riskUsd * 1.01) {
+    return deny(`Minimum exchange quantity risks ${realizedRiskUsd.toFixed(2)}, above policy budget ${riskUsd.toFixed(2)}.`);
+  }
+  if (typeof args.availableUsdt === "number" && args.availableUsdt > 0 &&
+      notional > args.availableUsdt * leverage) {
+    return deny(`Notional ${notional.toFixed(2)} exceeds available margin at ${leverage}x leverage.`);
+  }
   if (notional < instrument.minOrderAmount) {
     return deny(`Notional ${notional.toFixed(2)} below minOrderAmount ${instrument.minOrderAmount}.`);
   }

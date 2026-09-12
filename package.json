@@ -2,6 +2,9 @@
   "name": "aetherai",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "description": "AetherAI — autonomous agentic trading intelligence for Bitget AI Hackathon Season 2",
   "scripts": {
     "dev": "next dev --port 3100",

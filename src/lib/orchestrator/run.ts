@@ -38,7 +38,8 @@ import { foldGates, gate } from "./gates";
 
 export async function runAether(req: RunRequest = {}) {
   const started = Date.now();
-  const configuredMode = String(process.env.AETHER_MODE || "paper").toLowerCase();
+  const requestedMode = String(req.mode || "").toLowerCase();
+  const configuredMode = requestedMode || String(process.env.AETHER_MODE || "paper").toLowerCase();
   const mode: Mode = configuredMode === "live" || configuredMode === "paused" ? configuredMode : "paper";
   const cfg = bitgetConfigFromEnv();
   const bitget = bitgetMode(cfg);
@@ -177,6 +178,24 @@ export async function runAether(req: RunRequest = {}) {
     thesis,
   });
   const council = councilGate(elders);
+  const directionalVotes = council.votes.LONG + council.votes.SHORT;
+  const finalConfidence = computeConfidence({
+    mtf,
+    regime,
+    structure,
+    technicals,
+    micro,
+    fundingRate: market.funding.fundingRate,
+    catalyst: research.catalyst,
+    correlation,
+    psychology,
+    session: session.session,
+    quality: research.quality,
+    sampleTrades: history.settled,
+    historicalWinRate: history.settled >= 30 ? history.wins / history.settled : undefined,
+    councilAgreement: council.agreement,
+    councilDirectionalVotes: directionalVotes,
+  });
 
   const staleMs = Date.now() - market.fetchedAt;
   const existing = getOpenBySymbol(inst.symbol);
@@ -203,12 +222,13 @@ export async function runAether(req: RunRequest = {}) {
     structure,
     micro,
     regime,
-    calibrated: confidence.calibrated,
+    calibrated: finalConfidence.calibrated,
     fundingRate: market.funding.fundingRate,
     feeRate: inst.takerFeeRate || 0.0006,
+    availableUsdt: account.availableUsdt,
   });
 
-  const sessionPass = confidence.calibrated >= session.threshold;
+  const sessionPass = finalConfidence.calibrated >= session.threshold;
   const secDown = research.quality.failures.some((f) => f.startsWith("SEC:") && f.includes("HTTP 5"));
   const researchOk = !secDown && research.quality.freshSubstantive > 0;
   const researchReason = secDown
@@ -226,7 +246,7 @@ export async function runAether(req: RunRequest = {}) {
     gate("mtf", mtf.consensus !== "NO_TRADE" && !mtf.conflict || mtf.confluence >= 0.6, `confluence=${mtf.confluence.toFixed(2)} consensus=${mtf.consensus}`),
     gate("microstructure", micro.spreadBps <= policy.maxSpreadBps, `spread ${micro.spreadBps.toFixed(2)} bps`),
     gate("catalyst", true, `${research.catalyst.classification}: ${research.catalyst.rationale}`, false),
-    gate("confidence", sessionPass, `calibrated ${(confidence.calibrated * 100).toFixed(1)}% vs session ${(session.threshold * 100).toFixed(0)}%`),
+    gate("confidence", sessionPass, `calibrated ${(finalConfidence.calibrated * 100).toFixed(1)}% vs session ${(session.threshold * 100).toFixed(0)}%`),
     gate("session", sessionPass, `${session.label} threshold ${(session.threshold * 100).toFixed(0)}%`),
     gate("council", council.passed, council.summary),
     gate("kill_switch", !kill.tripped && !killState.tripped, kill.reasons.join("; ") || killState.reasons.join("; ") || "clear"),
@@ -268,6 +288,7 @@ export async function runAether(req: RunRequest = {}) {
         mark: market.ticker.last,
         qty: risk.qty,
         cfg,
+        expectedDirection: council.consensus,
       });
       if (execution.error) bumpFailedOrders();
       else if (council.consensus === "LONG" || council.consensus === "SHORT") {
@@ -291,7 +312,7 @@ export async function runAether(req: RunRequest = {}) {
           thesis: thesis.text,
           regime: regime.regime,
           session: session.session,
-          calibrated: confidence.calibrated,
+          calibrated: finalConfidence.calibrated,
           elders: elders.map((e) => ({ elder: e.elder, vote: e.vote })),
           status: "open",
         });
@@ -336,7 +357,7 @@ export async function runAether(req: RunRequest = {}) {
     intelligence: { technicals, structure, regime, mtf, micro, psychology, correlation },
     research,
     thesis,
-    confidence,
+    confidence: finalConfidence,
     elders,
     council,
     risk,
@@ -362,14 +383,14 @@ export async function runAether(req: RunRequest = {}) {
     symbol: inst.symbol,
     mode,
     decision,
-    calibrated: confidence.calibrated,
+    calibrated: finalConfidence.calibrated,
     payload: JSON.stringify(payload),
   });
   appendPaperLog({
     ts: payload.at,
     symbol: inst.symbol,
     decision,
-    calibrated: confidence.calibrated,
+    calibrated: finalConfidence.calibrated,
     council: council.summary,
     orderId: execution?.orderId ?? null,
     simulated: execution?.simulated ?? true,

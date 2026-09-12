@@ -86,4 +86,11 @@ describe("confidence", () => {
     expect(c.adjustments.find((a) => a.name === "historical_edge")).toBeUndefined();
     expect(c.adjustments.find((a) => a.name === "sample_size")).toBeUndefined();
   });
+
+  it("penalizes directional council disagreement in the final trace", () => {
+    const aligned = stub({ councilAgreement: 1, councilDirectionalVotes: 7 });
+    const split = stub({ councilAgreement: 4 / 7, councilDirectionalVotes: 5 });
+    expect(split.adjustments.find((a) => a.name === "council_disagreement")).toBeDefined();
+    expect(split.calibrated).toBeLessThan(aligned.calibrated);
+  });
 });

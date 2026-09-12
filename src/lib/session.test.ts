@@ -18,4 +18,12 @@ describe("session policy", () => {
     const s = currentSession(new Date("2026-09-09T14:00:00Z"));
     expect(s.session).toBe("OVERLAP_LONDON_NY");
   });
+
+  it("treats weekends as off-session instead of claiming a regional session", () => {
+    const s = currentSession(new Date("2026-09-12T16:00:00Z"));
+    expect(s.weekend).toBe(true);
+    expect(s.session).toBe("OFF");
+    expect(s.label).toMatch(/Weekend/);
+    expect(s.threshold).toBe(policy.sessionConfidence.OFF);
+  });
 });

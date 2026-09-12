@@ -8,6 +8,7 @@ export async function confirmFill(args: {
   mark: number;
   qty: number;
   cfg: BitgetConfig;
+  expectedDirection?: "LONG" | "SHORT";
 }): Promise<ExecutionReceipt> {
   const base = { ...args.receipt, confirmedAt: nowIso() };
   if (args.receipt.error) return base;
@@ -26,14 +27,18 @@ export async function confirmFill(args: {
       const info = await fetchOrderInfo({ orderId: args.receipt.orderId, clientOid: args.receipt.clientOid }, args.cfg);
       if (info && (info.orderStatus === "filled" || info.cumExecQty > 0)) {
         const positions = await fetchPositions(args.receipt.symbol, args.cfg).catch(() => []);
-        const pos = positions.find((p) => p.symbol === args.receipt.symbol && p.total > 0);
+        const expectedSide = args.expectedDirection === "SHORT" ? "short" : args.expectedDirection === "LONG" ? "long" : undefined;
+        const pos = positions.find((p) => p.symbol === args.receipt.symbol && p.total > 0 && (!expectedSide || p.posSide === expectedSide) && p.total + 1e-12 >= (info.cumExecQty || args.qty));
+        if (!pos) {
+          return { ...base, fillPrice: info.avgPrice || args.mark, fillQty: info.cumExecQty || args.qty, orderStatus: info.orderStatus, positionConfirmed: false, error: "Fill reported, but the expected exchange position was not confirmed.", raw: { order: info, positions } };
+        }
         return {
           ...base,
           fillPrice: info.avgPrice || args.mark,
           fillQty: info.cumExecQty || args.qty,
           orderStatus: info.orderStatus,
-          positionConfirmed: Boolean(pos),
-          raw: { order: info, position: pos ?? null },
+          positionConfirmed: true,
+          raw: { order: info, position: pos },
         };
       }
       if (info && (info.orderStatus === "cancelled")) {

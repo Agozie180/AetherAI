@@ -38,6 +38,17 @@ npm run dev
 
 Desk: http://localhost:3100
 
+## Vercel demo deployment
+
+1. Import this repository into Vercel.
+2. Select Node.js `22.x` or newer.
+3. Add `AETHER_MODE=paper`, `BITGET_PAPER=1`, and a long random `AETHER_ADMIN_TOKEN`.
+4. Deploy. Public Bitget/SEC/news research works without exchange or LLM keys.
+5. Add `OPENAI_API_KEY` plus `LLM_PROVIDER=openai` only if you want live LLM Elder votes; otherwise the app explicitly uses deterministic Elders.
+6. Add Bitget Demo credentials only when you intend to demonstrate authenticated paper orders.
+
+Vercel storage is ephemeral and instance-local. The app automatically stores its SQLite state under `/tmp/aetherai` there, so a deployment restart can clear runs, positions, and reviews. `AETHER_DATA_DIR` accepts a local filesystem path; it is not a database URL. Do not run `npm run paper-loop` on Vercel; use a separate scheduled worker and durable storage for competition logs. Simulation is never labeled as a Bitget fill.
+
 ## Research stack (this is the point)
 
 | Question | Source |

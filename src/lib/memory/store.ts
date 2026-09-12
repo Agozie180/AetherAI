@@ -31,7 +31,15 @@ export interface StoredRun {
 let _db: DatabaseSync | null = null;
 
 function dataDir(): string {
-  const dir = join(process.cwd(), "data");
+  // Vercel functions have a writable ephemeral /tmp filesystem, but the
+  // project directory is read-only and instances do not share local state.
+  // Use AETHER_DATA_DIR when durable storage is provided by the deployment;
+  // otherwise keep local development on ./data and serverless demos honest.
+  const dir = process.env.AETHER_DATA_DIR
+    ? process.env.AETHER_DATA_DIR
+    : process.env.VERCEL
+      ? join("/tmp", "aetherai")
+      : join(process.cwd(), "data");
   mkdirSync(dir, { recursive: true });
   return dir;
 }

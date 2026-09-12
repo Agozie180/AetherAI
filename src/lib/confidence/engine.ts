@@ -25,6 +25,8 @@ export function computeConfidence(input: {
   session: SessionId;
   quality: DataQuality;
   sampleTrades: number;
+  councilAgreement?: number;
+  councilDirectionalVotes?: number;
   /** Realized win rate (0..1) of similar historical setups. Only supplied — and
    *  only trusted — once the settled sample is large enough (>= 30). */
   historicalWinRate?: number;
@@ -86,6 +88,17 @@ export function computeConfidence(input: {
   }
   if (input.mtf.conflict) {
     adjustments.push({ name: "mtf_conflict", delta: -0.08, reason: "Timeframes disagree." });
+  }
+  if (typeof input.councilAgreement === "number") {
+    const agreement = clamp(input.councilAgreement, 0, 1);
+    const directional = input.councilDirectionalVotes ?? 0;
+    if (directional > 0 && agreement < 0.75) {
+      adjustments.push({
+        name: "council_disagreement",
+        delta: -Math.min(0.1, (0.75 - agreement) * 0.25),
+        reason: `Council agreement ${(agreement * 100).toFixed(1)}% across ${directional} directional vote(s).`,
+      });
+    }
   }
   if (input.micro.pressure === "bid" && input.mtf.consensus === "SHORT") {
     adjustments.push({ name: "flow_conflict", delta: -0.05, reason: "Book bid-heavy vs short consensus." });

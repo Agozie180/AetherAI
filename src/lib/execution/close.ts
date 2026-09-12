@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { BitgetConfig } from "../bitget/client";
 import { bitgetMode, bitgetPost } from "../bitget/client";
+import { fetchOrderInfo } from "../bitget/account";
 import type { OpenPosition } from "../types";
-import { nowIso } from "../util";
+import { nowIso, sleep } from "../util";
 
 export interface CloseResult {
   ok: boolean;
@@ -20,7 +21,9 @@ export async function closePosition(args: {
   cfg: BitgetConfig;
   reason: string;
 }): Promise<CloseResult> {
-  const clientOid = `ax${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  const clientOid = args.position.id
+    ? `ax${createHash("sha256").update(`${args.position.id}:${args.reason}`).digest("hex").slice(0, 16)}`
+    : `ax${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const side = args.position.direction === "LONG" ? "sell" : "buy";
   const posSide = args.position.direction === "LONG" ? "long" : "short";
 
@@ -49,7 +52,7 @@ export async function closePosition(args: {
       },
       args.cfg,
     );
-    return {
+    const receipt = {
       ok: true,
       simulated: false,
       orderId: data.orderId,
@@ -57,6 +60,16 @@ export async function closePosition(args: {
       exit: args.mark,
       at: nowIso(),
     };
+    if (!receipt.orderId) return { ...receipt, ok: false, error: "Bitget accepted close request without an orderId." };
+    for (let i = 0; i < 8; i++) {
+      const info = await fetchOrderInfo({ orderId: receipt.orderId, clientOid: receipt.clientOid }, args.cfg).catch(() => undefined);
+      if (info && (info.orderStatus === "filled" || info.cumExecQty >= args.position.qty)) return receipt;
+      if (info && ["cancelled", "rejected", "failed"].includes(info.orderStatus.toLowerCase())) {
+        return { ...receipt, ok: false, error: `Bitget close order ${info.orderStatus}.` };
+      }
+      await sleep(400);
+    }
+    return { ...receipt, ok: false, error: "Close order was not confirmed filled within timeout." };
   } catch (err) {
     return {
       ok: false,
