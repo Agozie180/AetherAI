@@ -30,7 +30,7 @@ AetherAI is **not** three apps. It is one autonomous desk. We submit **one** ent
 | 7 Elders with adversarial dissent | Agentic | Open architecture | `council.elders[]` votes | 5/7 LONG, Adversarial SHORT, strongest objection |
 | Evidence-based confidence | Agentic | All | `confidence.trace` | Raw → penalties → calibrated. No LLM 73% |
 | Risk + 5x leverage cap + EV | Agentic | All | Policy engine; LLM cannot override | NO TRADE if EV negative |
-| Bitget Demo/live order + `orderId` | Agentic | Event-Driven | Persisted receipt or **SIMULATED** label | Never fake an order id |
+| Bitget Demo/live order + `orderId` | Agentic | Event-Driven | Real Bitget receipt with `orderId`, or an explicit PREVIEW / blocked receipt | Never fake an order id or a fill |
 | Post-trade self-review | Desk | Review & Self-Evolution | Memory store | “Similar setups: n; sample insufficient” |
 | NL questions over stored state | Desk | Personalized Workbench | `/api/ask` | “Why didn’t you trade?” answers from gates |
 

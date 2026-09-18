@@ -7,7 +7,7 @@ import { nowIso, sleep } from "../util";
 
 export interface CloseResult {
   ok: boolean;
-  simulated: boolean;
+  submitted: boolean;
   orderId?: string;
   clientOid: string;
   exit: number;
@@ -27,12 +27,14 @@ export async function closePosition(args: {
   const side = args.position.direction === "LONG" ? "sell" : "buy";
   const posSide = args.position.direction === "LONG" ? "long" : "short";
 
-  if (args.position.simulated || bitgetMode(args.cfg) === "public") {
+  if (bitgetMode(args.cfg) === "public") {
+    // No credentials: we cannot flatten a real position and will not pretend to.
     return {
-      ok: true,
-      simulated: true,
+      ok: false,
+      submitted: false,
       clientOid,
       exit: args.mark,
+      error: "Bitget credentials required to close a position. No simulated close.",
       at: nowIso(),
     };
   }
@@ -54,7 +56,7 @@ export async function closePosition(args: {
     );
     const receipt = {
       ok: true,
-      simulated: false,
+      submitted: true,
       orderId: data.orderId,
       clientOid: data.clientOid || clientOid,
       exit: args.mark,
@@ -73,7 +75,7 @@ export async function closePosition(args: {
   } catch (err) {
     return {
       ok: false,
-      simulated: false,
+      submitted: true,
       clientOid,
       exit: args.mark,
       error: err instanceof Error ? err.message : String(err),

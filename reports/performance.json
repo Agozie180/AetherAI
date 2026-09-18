@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-09-17T16:25:20.657Z",
+  "sampleSize": 0,
+  "window": {
+    "firstClosedAt": null,
+    "lastClosedAt": null
+  },
+  "wins": 0,
+  "losses": 0,
+  "breakeven": 0,
+  "winRate": 0,
+  "totalPnlUsd": 0,
+  "grossProfitUsd": 0,
+  "grossLossUsd": 0,
+  "profitFactor": null,
+  "avgWinUsd": 0,
+  "avgLossUsd": 0,
+  "expectancyUsd": 0,
+  "totalR": 0,
+  "avgR": 0,
+  "sharpePerTrade": null,
+  "sortinoPerTrade": null,
+  "maxDrawdownUsd": 0,
+  "maxDrawdownR": 0,
+  "bestTradeUsd": 0,
+  "worstTradeUsd": 0,
+  "avgHoldMinutes": 0,
+  "byExitReason": {},
+  "byDirection": {
+    "LONG": {
+      "count": 0,
+      "pnlUsd": 0
+    },
+    "SHORT": {
+      "count": 0,
+      "pnlUsd": 0
+    }
+  },
+  "bySymbol": {},
+  "equityCurve": [],
+  "notes": [
+    "No settled trades yet. Metrics populate as the paper loop closes positions."
+  ]
+}

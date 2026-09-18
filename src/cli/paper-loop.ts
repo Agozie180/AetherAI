@@ -26,14 +26,14 @@ async function cycle(): Promise<unknown> {
       entries.push({
         symbol,
         decision: (run as { decision?: string }).decision,
-        execution: (run as { execution?: { orderId?: string; simulated?: boolean; error?: string } }).execution,
+        execution: (run as { execution?: { orderId?: string; submitted?: boolean; preview?: boolean; mode?: string; error?: string } }).execution,
       });
     }
   }
   const snapshot = {
     ts: nowIso(),
     kill: loadKill(),
-    open: loadPositions().map((p) => ({ id: p.id, symbol: p.symbol, direction: p.direction, simulated: p.simulated })),
+    open: loadPositions().map((p) => ({ id: p.id, symbol: p.symbol, direction: p.direction, mode: p.mode, orderId: p.orderId })),
     monitor: monitor.ticks,
     entries,
   };

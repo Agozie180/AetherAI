@@ -15,8 +15,7 @@ function trade(i: number, win: boolean): SettledTrade {
     invalidation: "x",
     invalidationPrice: 96,
     leverage: 5,
-    simulated: true,
-    mode: "simulated",
+    mode: "paper",
     clientOid: "c",
     openedAt: new Date().toISOString(),
     thesis: "t",
@@ -31,7 +30,7 @@ function trade(i: number, win: boolean): SettledTrade {
     rMultiple: win ? 2 : -1,
     pnlUsd: win ? 10 : -5,
     durationMs: 1,
-    closeSimulated: true,
+    closeSubmitted: true,
   };
 }
 

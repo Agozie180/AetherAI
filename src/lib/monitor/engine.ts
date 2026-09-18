@@ -58,7 +58,7 @@ export function evaluatePosition(args: {
   if (args.failedOrders >= 3) {
     return { action: "KILL_FLATTEN", reason: "Repeated failed orders.", thesisValid, tpHit, slHit, lastClose, mark: args.mark, events };
   }
-  if (args.atrPct > 0.06) {
+  if (args.atrPct > policy.atrShockFlattenPct) {
     return { action: "KILL_FLATTEN", reason: `Volatility shock ATR ${(args.atrPct * 100).toFixed(2)}% of price.`, thesisValid, tpHit, slHit, lastClose, mark: args.mark, events };
   }
   if (slHit) return { action: "CLOSE", reason: "Stop hit.", thesisValid, tpHit, slHit, lastClose, mark: args.mark, events };

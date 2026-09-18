@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAether } from "@/lib/orchestrator/run";
 import type { Mode } from "@/lib/types";
-import { requireAdmin } from "@/lib/auth";
+import { isAdmin, requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,15 @@ export async function POST(req: NextRequest) {
       execute: Boolean(body.execute),
       mode: body.mode,
     });
-    return NextResponse.json({ ok: true, run: out });
+    // Account equity is operator-only. Anonymous callers (the public demo)
+    // still get the full analysis, but the balance is redacted to its
+    // non-sensitive shape so the unauthenticated payload never leaks funds.
+    // (Early-exit runs have no `account` field at all.)
+    let run: unknown = out;
+    if (!isAdmin(req) && "account" in out) {
+      run = { ...out, account: { source: out.account.source, hasCredentials: out.account.hasCredentials } };
+    }
+    return NextResponse.json({ ok: true, run });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }

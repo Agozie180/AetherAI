@@ -32,7 +32,6 @@ function pos(overrides: Partial<OpenPosition> = {}): OpenPosition {
     invalidation: "close below 95",
     invalidationPrice: 95,
     leverage: 3,
-    simulated: true,
     mode: "paper",
     clientOid: "coid-1",
     openedAt: "2026-01-01T00:00:00.000Z",
@@ -56,7 +55,7 @@ function settled(overrides: Partial<SettledTrade> = {}): SettledTrade {
     rMultiple: 2,
     pnlUsd: 100,
     durationMs: 86_400_000,
-    closeSimulated: true,
+    closeSubmitted: true,
     ...overrides,
   };
 }
@@ -133,7 +132,7 @@ describe("store — CRUD, fan-out, aggregates", () => {
         { name: "spread", passed: false, critical: true, reason: "too wide" },
       ],
       risk: { leverage: 3 },
-      execution: { orderId: "OID-9", symbol: "NVDAUSDT", side: "buy", qty: "10", simulated: true, mode: "paper", clientOid: "coid-9", orderStatus: "filled", submittedAt: "2026-01-01T00:00:01.000Z" },
+      execution: { orderId: "OID-9", symbol: "NVDAUSDT", side: "buy", qty: "10", submitted: true, mode: "paper", clientOid: "coid-9", orderStatus: "filled", submittedAt: "2026-01-01T00:00:01.000Z" },
     };
     store.saveRun({ id: "run-fan", createdAt: "2026-01-01T01:00:00.000Z", symbol: "NVDAUSDT", mode: "paper", decision: "LONG", calibrated: 0.66, payload: JSON.stringify(payload) });
 

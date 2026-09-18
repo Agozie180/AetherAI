@@ -3,13 +3,15 @@ import { bitgetGet, bitgetMode, bitgetPost, bitgetConfigFromEnv } from "./client
 import { num } from "../util";
 
 export interface AccountSnapshot {
-  source: "bitget" | "paper_config";
-  simulated: boolean;
+  /** "bitget" = real balance read from the exchange (Demo or live).
+   *  "none" = no credentials configured. "error" = credentials present but the
+   *  balance fetch failed. Only "bitget" is ever allowed to size or execute. */
+  source: "bitget" | "none" | "error";
+  hasCredentials: boolean;
   equityUsd: number;
   usdtEquity: number;
   availableUsdt: number;
   unrealisedPnl: number;
-  raw?: unknown;
   error?: string;
 }
 
@@ -41,16 +43,17 @@ export interface OrderSnapshot {
 }
 
 export async function fetchAccount(cfg: BitgetConfig = bitgetConfigFromEnv()): Promise<AccountSnapshot> {
-  const paperEquity = Number(process.env.AETHER_PAPER_EQUITY || 10_000);
   if (bitgetMode(cfg) === "public") {
+    // No credentials. We do NOT invent a balance — sizing and execution are
+    // blocked upstream by the account gate. Analysis still runs on public data.
     return {
-      source: "paper_config",
-      simulated: true,
-      equityUsd: paperEquity,
-      usdtEquity: paperEquity,
-      availableUsdt: paperEquity,
+      source: "none",
+      hasCredentials: false,
+      equityUsd: 0,
+      usdtEquity: 0,
+      availableUsdt: 0,
       unrealisedPnl: 0,
-      error: "No Bitget keys. Using AETHER_PAPER_EQUITY. Not a live balance.",
+      error: "No Bitget credentials. Add Demo (paper) or live keys to size and execute.",
     };
   }
   try {
@@ -65,22 +68,26 @@ export async function fetchAccount(cfg: BitgetConfig = bitgetConfigFromEnv()): P
     if (!Number.isFinite(num(data.accountEquity ?? data.usdtEquity)) || num(data.accountEquity ?? data.usdtEquity) <= 0) {
       throw new Error("Bitget account response has no positive equity");
     }
+    // NOTE: the raw asset breakdown is deliberately NOT returned. It used to be
+    // embedded in the run payload, which is reachable by unauthenticated
+    // callers; that leaked the account balance. Only summary numbers survive.
     return {
       source: "bitget",
-      simulated: false,
+      hasCredentials: true,
       equityUsd: num(data.accountEquity ?? data.usdtEquity),
       usdtEquity: num(data.usdtEquity),
       availableUsdt: num(usdt?.available ?? usdt?.equity ?? data.usdtEquity),
       unrealisedPnl: num(data.usdtUnrealisedPnl ?? data.unrealisedPnl),
-      raw: data,
     };
   } catch (err) {
+    // Credentials exist but the balance could not be read. We refuse to
+    // substitute a fake balance — the account gate will block execution.
     return {
-      source: "paper_config",
-      simulated: true,
-      equityUsd: paperEquity,
-      usdtEquity: paperEquity,
-      availableUsdt: paperEquity,
+      source: "error",
+      hasCredentials: true,
+      equityUsd: 0,
+      usdtEquity: 0,
+      availableUsdt: 0,
       unrealisedPnl: 0,
       error: err instanceof Error ? err.message : String(err),
     };

@@ -115,7 +115,7 @@ async function settle(
     pnlUsd,
     durationMs: Date.parse(nowIso()) - Date.parse(pos.openedAt),
     closeOrderId: close.orderId,
-    closeSimulated: close.simulated,
+    closeSubmitted: close.submitted,
   };
   appendSettled(settled);
   const remaining = loadPositions().filter((p) => p.id !== pos.id);

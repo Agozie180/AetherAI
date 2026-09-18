@@ -12,14 +12,17 @@ export async function confirmFill(args: {
 }): Promise<ExecutionReceipt> {
   const base = { ...args.receipt, confirmedAt: nowIso() };
   if (args.receipt.error) return base;
-  if (args.receipt.simulated || !args.receipt.orderId) {
+  // A preview (execute=false) is never a fill and must never be confirmed.
+  if (args.receipt.preview || !args.receipt.submitted) {
+    return { ...base, positionConfirmed: false };
+  }
+  if (!args.receipt.orderId) {
+    // Submitted but the exchange returned no orderId — we cannot confirm and
+    // will not fabricate a fill.
     return {
       ...base,
-      simulated: true,
-      fillPrice: args.mark,
-      fillQty: args.qty,
-      orderStatus: "simulated_fill",
-      positionConfirmed: true,
+      positionConfirmed: false,
+      error: base.error ?? "Order submitted but Bitget returned no orderId; fill cannot be confirmed.",
     };
   }
   for (let i = 0; i < 8; i++) {
