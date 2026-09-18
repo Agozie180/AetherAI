@@ -73,9 +73,11 @@ export async function placeFuturesOrder(args: {
   };
 
   if (!args.execute) {
+    // Dry-run preview: the exact body we would submit. Never a fill.
     return {
-      mode: args.mode,
-      simulated: true,
+      mode: args.mode === "paused" ? "paper" : args.mode,
+      submitted: false,
+      preview: true,
       symbol: args.instrument.symbol,
       side,
       orderType: "market",
@@ -84,7 +86,26 @@ export async function placeFuturesOrder(args: {
       takeProfit: body.takeProfit,
       stopLoss: body.stopLoss,
       submittedAt: nowIso(),
-      error: "execute=false; not submitted.",
+      note: "Preview only (execute=false). This is the order that would be sent; nothing was submitted.",
+    };
+  }
+
+  const mode = bitgetMode(args.cfg);
+  if (mode === "public") {
+    // No credentials. We refuse to fabricate a fill. Execution is blocked
+    // upstream by the credential/account gates; this is the last-line guard.
+    return {
+      mode: args.mode === "paused" ? "paper" : args.mode,
+      submitted: false,
+      symbol: args.instrument.symbol,
+      side,
+      orderType: "market",
+      qty: body.qty,
+      clientOid,
+      takeProfit: body.takeProfit,
+      stopLoss: body.stopLoss,
+      submittedAt: nowIso(),
+      error: "Bitget credentials required to execute. No simulated fills.",
     };
   }
 
@@ -97,8 +118,8 @@ export async function placeFuturesOrder(args: {
   });
   if (!lev.ok) {
     return {
-      mode: args.mode,
-      simulated: false,
+      mode: args.cfg.paper ? "paper" : "live",
+      submitted: false,
       symbol: args.instrument.symbol,
       side,
       orderType: "market",
@@ -112,24 +133,6 @@ export async function placeFuturesOrder(args: {
     };
   }
 
-  const mode = bitgetMode(args.cfg);
-  if (mode === "public") {
-    return {
-      mode: "simulated",
-      simulated: true,
-      symbol: args.instrument.symbol,
-      side,
-      orderType: "market",
-      qty: body.qty,
-      clientOid,
-      takeProfit: body.takeProfit,
-      stopLoss: body.stopLoss,
-      leverageSet: lev.detail,
-      submittedAt: nowIso(),
-      raw: { note: "No Bitget API keys. Local simulation only. NOT a live or demo fill.", leverage: lev },
-    };
-  }
-
   try {
     const data = await bitgetPost<{ orderId?: string; clientOid?: string }>(
       "/api/v3/trade/place-order",
@@ -138,7 +141,7 @@ export async function placeFuturesOrder(args: {
     );
     return {
       mode: args.cfg.paper ? "paper" : "live",
-      simulated: false,
+      submitted: true,
       symbol: args.instrument.symbol,
       side,
       orderType: "market",
@@ -154,7 +157,7 @@ export async function placeFuturesOrder(args: {
   } catch (err) {
     return {
       mode: args.cfg.paper ? "paper" : "live",
-      simulated: false,
+      submitted: true,
       symbol: args.instrument.symbol,
       side,
       orderType: "market",
@@ -162,6 +165,7 @@ export async function placeFuturesOrder(args: {
       clientOid,
       takeProfit: body.takeProfit,
       stopLoss: body.stopLoss,
+      leverageSet: lev.detail,
       submittedAt: nowIso(),
       error: err instanceof Error ? err.message : String(err),
     };

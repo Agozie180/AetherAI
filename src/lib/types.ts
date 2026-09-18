@@ -185,8 +185,14 @@ export interface ConfidenceTrace {
 }
 
 export interface ExecutionReceipt {
-  mode: Mode | "simulated";
-  simulated: boolean;
+  /** Real routing only. "paper" = Bitget Demo (paptrading:1); "live" = live. */
+  mode: Mode;
+  /** True only once the order was actually sent to Bitget. A preview (execute
+   *  = false) or a blocked attempt (no credentials) is never submitted, and no
+   *  fill is ever fabricated. */
+  submitted: boolean;
+  /** A dry-run: the exact order body we would send, not sent. Not a fill. */
+  preview?: boolean;
   symbol: string;
   side: "buy" | "sell";
   orderType: "market" | "limit";
@@ -201,6 +207,7 @@ export interface ExecutionReceipt {
   positionConfirmed?: boolean;
   leverageSet?: string;
   raw?: unknown;
+  note?: string;
   error?: string;
   submittedAt: string;
   confirmedAt?: string;
@@ -218,8 +225,8 @@ export interface OpenPosition {
   invalidation: string;
   invalidationPrice: number;
   leverage: number;
-  simulated: boolean;
-  mode: Mode | "simulated";
+  /** Real routing only: "paper" (Bitget Demo) or "live". */
+  mode: Mode;
   orderId?: string;
   clientOid: string;
   openedAt: string;
@@ -239,7 +246,8 @@ export interface SettledTrade extends OpenPosition {
   pnlUsd: number;
   durationMs: number;
   closeOrderId?: string;
-  closeSimulated: boolean;
+  /** True once the closing order was actually sent to Bitget. */
+  closeSubmitted: boolean;
 }
 
 export interface TradeReview {

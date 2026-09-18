@@ -5,6 +5,8 @@ dist
 .env
 .env.local
 data/*.db
+data/*.db-shm
+data/*.db-wal
 data/*.jsonl
 data/*.json
 data/cache

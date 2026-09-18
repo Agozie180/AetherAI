@@ -39,7 +39,7 @@ export function reviewTrade(trade: SettledTrade, ctx?: { regimeNow?: string }): 
     catalystNote: trade.exitReason === "thesis_invalidated" ? "Catalyst/thesis did not hold to target." : "Recorded for next calibration.",
     microstructureNote: "Monitor used mark vs stop/target; CVD not re-simulated on exit.",
     tpslReasonable: Math.abs(trade.rMultiple) < 8,
-    executionNote: trade.closeSimulated ? "Exit SIMULATED — not a Bitget fill." : `Bitget close ${trade.closeOrderId ?? "no id"}`,
+    executionNote: trade.closeSubmitted ? `Bitget close ${trade.closeOrderId ?? "no id"}` : "Exit was not submitted to Bitget.",
     nextTime:
       !directionCorrect && trade.calibrated > 0.65
         ? "High confidence was wrong — raise conflict penalties for this regime."

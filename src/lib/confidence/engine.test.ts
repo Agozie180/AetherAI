@@ -26,8 +26,8 @@ function stub(over: Record<string, unknown> = {}) {
     },
     micro: {
       spread: 0.01, spreadBps: 4, mid: 1, bidDepth: 5000, askDepth: 4000, imbalance: 0.56, pressure: "bid",
-      tradeImbalance: 0.1, aggressiveBuyShare: 0.55, cvd: 12, largeTrades: [], whaleNote: "", liquidityNote: "",
-      capability: { orderBook: "AVAILABLE", publicFills: "AVAILABLE", cvd: "AVAILABLE", whaleFeed: "UNAVAILABLE", liquidationTape: "UNAVAILABLE", openInterest: "AVAILABLE", funding: "AVAILABLE" },
+      tradeImbalance: 0.1, aggressiveBuyShare: 0.55, cvd: 12, cvdNote: "", largeTrades: [], whaleNote: "", liquidityNote: "",
+      capability: { orderBook: "AVAILABLE", publicFills: "AVAILABLE", cvd: "WINDOW_ONLY", whaleFeed: "UNAVAILABLE", liquidationTape: "UNAVAILABLE", openInterest: "AVAILABLE", funding: "AVAILABLE" },
     },
     fundingRate: 0.0001,
     catalyst: { classification: "known", labels: ["earnings_or_filing"], supporting: [], rationale: "x" },

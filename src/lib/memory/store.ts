@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { KillState, OpenPosition, SettledTrade, TradeReview } from "../types";
@@ -272,7 +272,7 @@ function fanOutRun(runId: string, payloadStr: string): void {
         nn(Number(ex.qty) || null),
         nn(ex.fillPrice as number),
         nn((risk.leverage as number) ?? (ex.leverageSet ? Number(ex.leverageSet) : undefined)),
-        b(ex.simulated),
+        b(false), // legacy column; nothing is simulated anymore. Real state is in the run payload.
         nn(ex.mode as string),
         nn(ex.clientOid as string),
         nn(ex.orderStatus as string),
@@ -327,7 +327,7 @@ function positionCols(row: OpenPosition): unknown[] {
     row.stop,
     row.takeProfit,
     row.status,
-    b(row.simulated),
+    b(false), // legacy column; positions are real (paper=Demo or live). Kept to avoid a schema migration.
     nn(row.orderId),
     nn(row.clientOid),
     nn(row.openedAt),
@@ -395,6 +395,53 @@ export function listSettled(limit = 200): SettledTrade[] {
     .prepare(`SELECT payload FROM (SELECT payload, rowid FROM settled ORDER BY rowid DESC LIMIT ?) ORDER BY rowid ASC`)
     .all(limit) as Array<{ payload: string }>;
   return rows.map((r) => JSON.parse(r.payload) as SettledTrade);
+}
+
+export function countSettled(): number {
+  const row = db().prepare(`SELECT COUNT(*) AS n FROM settled`).get() as { n: number };
+  return row.n;
+}
+
+/**
+ * Remove settled trades whose stored mode is neither "paper" nor "live" — i.e.
+ * seed/demo artifacts that were never actually routed to Bitget (a real routed
+ * trade is always mode "paper" (Demo) or "live"). Returns the removed rows so a
+ * caller can back them up before discarding. The genuine track record — the
+ * only thing judges should ever see scored — is never touched.
+ *
+ * Cleans BOTH the live `settled` table AND the `settled.jsonl` migration source.
+ * The latter is essential: `migrateFromJsonl` re-seeds the table from that file
+ * whenever it is empty, so a table-only delete would silently reappear on the
+ * next process start.
+ */
+export function purgeUnrealSettled(): SettledTrade[] {
+  const isReal = (t: SettledTrade) => t.mode === "paper" || t.mode === "live";
+  const removed = new Map<string, SettledTrade>();
+
+  // 1) Live DB table.
+  const rows = db().prepare(`SELECT payload FROM settled`).all() as Array<{ payload: string }>;
+  const del = db().prepare(`DELETE FROM settled WHERE id = ?`);
+  for (const r of rows) {
+    const t = JSON.parse(r.payload) as SettledTrade;
+    if (!isReal(t)) {
+      del.run(t.id);
+      removed.set(t.id, t);
+    }
+  }
+
+  // 2) Migration source (data/settled.jsonl) — rewrite keeping only real rows,
+  //    so the seed cannot re-migrate. Only rewrite when it actually changes.
+  const file = dbFile("settled.jsonl");
+  if (existsSync(file)) {
+    const all = readJsonlFile<SettledTrade>(file);
+    const kept = all.filter((t) => t && t.id && isReal(t));
+    if (kept.length !== all.length) {
+      for (const t of all) if (t && t.id && !isReal(t)) removed.set(t.id, t);
+      writeFileSync(file, kept.map((t) => JSON.stringify(t)).join("\n") + (kept.length ? "\n" : ""), "utf8");
+    }
+  }
+
+  return [...removed.values()];
 }
 
 // ---------------------------------------------------------------------------

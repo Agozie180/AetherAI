@@ -18,6 +18,12 @@ export const policy = {
   minDepthUsd: 2_000,
   killSwitchLossUsd: 50,
   maxConcurrentPositions: 3,
+  // Volatility-shock band as a fraction of price (ATR/price). A new entry is
+  // blocked slightly earlier than an already-open position is force-flattened,
+  // so a trade taken at the edge of the band is not flattened on the very same
+  // tick. This 0.05→0.06 gap is intentional hysteresis, not copy-paste drift.
+  atrShockEntryPct: 0.05,
+  atrShockFlattenPct: 0.06,
   candleLimit: 200,
   timeframes: ["5m", "15m", "1H", "4H", "1D"] as const,
   sessionConfidence: {

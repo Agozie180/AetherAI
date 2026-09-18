@@ -86,6 +86,17 @@ export function computeConfidence(input: {
       reason: `Missing/failed sources: ${[...input.quality.missing, ...input.quality.failures].slice(0, 4).join("; ")}`,
     });
   }
+  const staleCount = input.quality.stale.length;
+  if (staleCount) {
+    // Sources we have but that are past their freshness window. Distinct from
+    // missing/failed data: the evidence exists but may no longer be true, so it
+    // shaves confidence rather than removing a component outright.
+    adjustments.push({
+      name: "data_staleness",
+      delta: -Math.min(0.09, 0.03 * staleCount),
+      reason: `Stale source(s): ${input.quality.stale.slice(0, 4).join("; ")}`,
+    });
+  }
   if (input.mtf.conflict) {
     adjustments.push({ name: "mtf_conflict", delta: -0.08, reason: "Timeframes disagree." });
   }

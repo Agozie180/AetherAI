@@ -17,7 +17,9 @@
     "run": "tsx src/cli/run.ts",
     "discover": "tsx src/cli/discover.ts",
     "monitor": "tsx src/cli/monitor.ts",
-    "paper-loop": "tsx src/cli/paper-loop.ts"
+    "paper-loop": "tsx src/cli/paper-loop.ts",
+    "report": "tsx src/cli/report.ts",
+    "trades": "tsx src/cli/trades.ts"
   },
   "dependencies": {
     "next": "^15.5.2",

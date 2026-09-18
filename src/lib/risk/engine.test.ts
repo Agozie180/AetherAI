@@ -50,8 +50,8 @@ function baseArgs(over: Record<string, unknown> = {}) {
     structure: { last: 100, swingHigh: 110, swingLow: 90, support: 90, resistance: 110, trend: "up", breakout: "none", rangePct: 0.2 },
     micro: {
       spread: 0.04, spreadBps: 4, mid: 100, bidDepth: 5000, askDepth: 4000, imbalance: 0.55, pressure: "bid",
-      tradeImbalance: 0.1, aggressiveBuyShare: 0.55, cvd: 12, largeTrades: [], whaleNote: "", liquidityNote: "",
-      capability: { orderBook: "AVAILABLE", publicFills: "AVAILABLE", cvd: "AVAILABLE", whaleFeed: "UNAVAILABLE", liquidationTape: "UNAVAILABLE", openInterest: "AVAILABLE", funding: "AVAILABLE" },
+      tradeImbalance: 0.1, aggressiveBuyShare: 0.55, cvd: 12, cvdNote: "", largeTrades: [], whaleNote: "", liquidityNote: "",
+      capability: { orderBook: "AVAILABLE", publicFills: "AVAILABLE", cvd: "WINDOW_ONLY", whaleFeed: "UNAVAILABLE", liquidationTape: "UNAVAILABLE", openInterest: "AVAILABLE", funding: "AVAILABLE" },
     },
     regime: { regime: "trending", volatility: "normal", atrPct: 0.01, chop: 0.3, rationale: "t" },
     calibrated: 0.7,

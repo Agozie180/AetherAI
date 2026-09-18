@@ -11,14 +11,23 @@ export interface MicrostructureSnapshot {
   pressure: "bid" | "ask" | "neutral";
   tradeImbalance: number;
   aggressiveBuyShare: number;
+  /**
+   * Signed volume delta (buy size − sell size) over the SAMPLED public-fills
+   * window only. It is a short-term order-flow measure, NOT a persisted,
+   * session-cumulative CVD: Bitget's public fills endpoint returns a bounded
+   * recent window and we do not stitch a continuous series across ticks. Named
+   * `cvd` for familiarity; see `cvdNote` and `capability.cvd` for the scope.
+   */
   cvd: number;
+  cvdNote: string;
   largeTrades: { side: "buy" | "sell"; price: number; size: number; ts: number }[];
   whaleNote: string;
   liquidityNote: string;
   capability: {
     orderBook: "AVAILABLE";
     publicFills: "AVAILABLE";
-    cvd: "AVAILABLE";
+    /** Window-scoped delta from sampled fills — not a true cumulative CVD feed. */
+    cvd: "WINDOW_ONLY";
     whaleFeed: "UNAVAILABLE";
     liquidationTape: "UNAVAILABLE";
     openInterest: "AVAILABLE";
@@ -78,6 +87,7 @@ export function microstructureSnapshot(args: {
     tradeImbalance,
     aggressiveBuyShare,
     cvd,
+    cvdNote: `Signed volume delta over ${args.fills.length} sampled fills (window only — not a session-cumulative CVD series).`,
     largeTrades: largeTrades.slice(0, 8),
     whaleNote:
       largeTrades.length === 0
@@ -87,7 +97,7 @@ export function microstructureSnapshot(args: {
     capability: {
       orderBook: "AVAILABLE",
       publicFills: "AVAILABLE",
-      cvd: "AVAILABLE",
+      cvd: "WINDOW_ONLY",
       whaleFeed: "UNAVAILABLE",
       liquidationTape: "UNAVAILABLE",
       openInterest: "AVAILABLE",
@@ -109,8 +119,8 @@ export function conflictBlurb(args: {
   largeSellShare: number;
 }): string {
   const bits: string[] = [];
-  if (args.cvd > 0) bits.push("CVD net buy");
-  else if (args.cvd < 0) bits.push("CVD net sell");
+  if (args.cvd > 0) bits.push("window CVD net buy");
+  else if (args.cvd < 0) bits.push("window CVD net sell");
   if (args.imbalance > 0.55) bits.push("book bid-heavy");
   else if (args.imbalance < 0.45) bits.push("book ask-heavy");
   if (args.fundingRate > 0.0003) bits.push("funding positive (longs pay)");

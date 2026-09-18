@@ -206,7 +206,7 @@ export async function runAether(req: RunRequest = {}) {
     spreadBps: micro.spreadBps,
     maxSpreadBps: policy.maxSpreadBps,
     maxStaleMs: policy.maxStaleMarketMs,
-    atrShock: regime.atrPct > 0.05,
+    atrShock: regime.atrPct > policy.atrShockEntryPct,
     realizedLossUsd: realizedLossUsd(),
     lossLimitUsd: policy.killSwitchLossUsd,
     failedOrders: killState.failedOrders,
@@ -217,7 +217,7 @@ export async function runAether(req: RunRequest = {}) {
     instrument: inst,
     last: market.ticker.last,
     vote: council.passed ? council.consensus : "NO_TRADE",
-    equityUsd: account.equityUsd || Number(process.env.AETHER_PAPER_EQUITY || 10_000),
+    equityUsd: account.equityUsd,
     technicals,
     structure,
     micro,
@@ -237,13 +237,13 @@ export async function runAether(req: RunRequest = {}) {
       ? `${research.quality.freshSubstantive} fresh sourced item(s)`
       : "no fresh sourced research beyond price action";
   const gates = [
-    gate("execution_mode", mode === "live" ? bitget === "live" : mode === "paper" ? bitget !== "live" : true, `configured=${mode}, exchange=${bitget}`),
-    gate("account_mode", mode !== "live" || (account.source === "bitget" && !account.simulated), account.error || `account source=${account.source}`),
+    gate("execution_mode", mode === "live" ? bitget === "live" : mode === "paper" ? bitget === "demo" : true, `configured=${mode}, exchange=${bitget}`),
+    gate("account_mode", mode === "paused" || account.source === "bitget", account.error || `account source=${account.source}`),
     gate("market_data", staleMs <= policy.maxStaleMarketMs, `staleness ${staleMs}ms`),
     gate("research", researchOk, researchReason),
     gate("instrument", resolved.tradableFutures, resolved.reason),
     gate("regime", regime.regime !== "choppy", `regime=${regime.regime}`),
-    gate("mtf", mtf.consensus !== "NO_TRADE" && !mtf.conflict || mtf.confluence >= 0.6, `confluence=${mtf.confluence.toFixed(2)} consensus=${mtf.consensus}`),
+    gate("mtf", mtf.consensus !== "NO_TRADE" && (!mtf.conflict || mtf.confluence >= 0.6), `confluence=${mtf.confluence.toFixed(2)} consensus=${mtf.consensus}`),
     gate("microstructure", micro.spreadBps <= policy.maxSpreadBps, `spread ${micro.spreadBps.toFixed(2)} bps`),
     gate("catalyst", true, `${research.catalyst.classification}: ${research.catalyst.rationale}`, false),
     gate("confidence", sessionPass, `calibrated ${(finalConfidence.calibrated * 100).toFixed(1)}% vs session ${(session.threshold * 100).toFixed(0)}%`),
@@ -304,8 +304,7 @@ export async function runAether(req: RunRequest = {}) {
           invalidation: risk.invalidation,
           invalidationPrice: council.consensus === "LONG" ? structure.support : structure.resistance,
           leverage: risk.leverage,
-          simulated: execution.simulated,
-          mode: execution.simulated ? "simulated" : mode,
+          mode: execution.mode,
           orderId: execution.orderId,
           clientOid: execution.clientOid,
           openedAt: nowIso(),
@@ -393,7 +392,7 @@ export async function runAether(req: RunRequest = {}) {
     calibrated: finalConfidence.calibrated,
     council: council.summary,
     orderId: execution?.orderId ?? null,
-    simulated: execution?.simulated ?? true,
+    submitted: execution?.submitted ?? false,
   });
   return payload;
 }

@@ -12,11 +12,18 @@ export default function Page() {
   const [question, setQuestion] = useState("Why didn't you trade?");
   const [answer, setAnswer] = useState("");
   const [desk, setDesk] = useState<Record<string, any> | null>(null);
+  const [perf, setPerf] = useState<Record<string, any> | null>(null);
 
   async function refreshDesk() {
     const res = await fetch("/api/state");
     const json = await res.json();
     if (json.ok) setDesk(json);
+  }
+
+  async function refreshPerf() {
+    const res = await fetch("/api/metrics");
+    const json = await res.json();
+    if (json.ok) setPerf(json.report);
   }
 
   async function analyze(execute = false) {
@@ -32,6 +39,7 @@ export default function Page() {
       if (!json.ok) throw new Error(json.error || "run failed");
       setRun(json.run);
       await refreshDesk();
+      await refreshPerf();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -56,7 +64,11 @@ export default function Page() {
   const adj = (run?.confidence?.adjustments ?? []) as { name: string; delta: number; reason: string }[];
 
   const status = useMemo(() => (run?.decision === "NO TRADE" ? "fail" : "pass"), [run]);
-  useEffect(() => { void refreshDesk(); }, []);
+  useEffect(() => { void refreshDesk(); void refreshPerf(); }, []);
+
+  const p = perf ?? {};
+  const pfmt = (n: number | null | undefined, dp = 2) => (n === null || n === undefined ? "n/a" : Number(n).toFixed(dp));
+  const ppct = (n: number | null | undefined) => (n === null || n === undefined ? "n/a" : `${(Number(n) * 100).toFixed(1)}%`);
 
   return (
     <main className="app">
@@ -89,6 +101,25 @@ export default function Page() {
             <span>Calibrated</span><div className={status}>{(run?.confidence?.calibrated * 100 || 0).toFixed(1)}%</div>
             <span>Decision</span><div className={status}>{run?.decision ?? "—"}</div>
           </div>
+        </div>
+
+        <div className="panel span2">
+          <h2>Track record (paper)</h2>
+          <div className="kv">
+            <span>Settled</span><div>{p.sampleSize ?? 0} (W {p.wins ?? 0} / L {p.losses ?? 0} / BE {p.breakeven ?? 0})</div>
+            <span>Win rate</span><div>{ppct(p.winRate)}</div>
+            <span>Total P/L</span><div className={(p.totalPnlUsd ?? 0) >= 0 ? "pass" : "fail"}>{pfmt(p.totalPnlUsd)} USD · {pfmt(p.totalR)} R</div>
+            <span>Expectancy</span><div>{pfmt(p.expectancyUsd)} USD/trade · {pfmt(p.avgR)} R/trade</div>
+            <span>Profit factor</span><div>{pfmt(p.profitFactor)}</div>
+            <span>Sharpe /trade</span><div>{pfmt(p.sharpePerTrade)}</div>
+            <span>Sortino /trade</span><div>{pfmt(p.sortinoPerTrade)}</div>
+            <span>Max drawdown</span><div>{pfmt(p.maxDrawdownUsd)} USD · {pfmt(p.maxDrawdownR)} R</div>
+            <span>Best / worst</span><div>{pfmt(p.bestTradeUsd)} / {pfmt(p.worstTradeUsd)} USD</div>
+            <span>Avg hold</span><div>{pfmt(p.avgHoldMinutes)} min</div>
+          </div>
+          {(p.notes ?? []).map((n: string, i: number) => (
+            <div className="item" key={i}>{n}</div>
+          ))}
         </div>
 
         <div className="panel">
@@ -162,7 +193,14 @@ export default function Page() {
         <div className="panel">
           <h2>Execution</h2>
           <div className="kv">
-            <span>Receipt</span><div>{run?.execution?.orderId ?? (run?.execution?.simulated ? "SIMULATED" : "none")}</div>
+            <span>Receipt</span><div>{run?.execution?.orderId ?? "—"}</div>
+            <span>State</span><div>{
+              !run?.execution ? "—"
+              : run.execution.error ? `blocked: ${run.execution.error}`
+              : run.execution.preview ? "PREVIEW — order not sent"
+              : run.execution.submitted ? `submitted (${String(run.execution.mode).toUpperCase()}${run.execution.positionConfirmed ? ", confirmed" : ""})`
+              : "not submitted"
+            }</div>
             <span>Stop</span><div>{run?.risk?.stop || "—"}</div>
             <span>TP</span><div>{run?.risk?.takeProfit || "—"}</div>
             <span>Invalidation</span><div>{run?.risk?.invalidation || run?.noTradeReason || "—"}</div>
@@ -173,7 +211,7 @@ export default function Page() {
           <h2>Open positions</h2>
           {(desk?.open ?? []).length === 0 ? <p className="item">Flat.</p> : (desk?.open ?? []).map((p: any) => (
             <div className="item" key={p.id}>
-              {p.symbol} {p.direction} @ {p.entry} {p.simulated ? "SIMULATED" : p.orderId}
+              {p.symbol} {p.direction} @ {p.entry} · {String(p.mode).toUpperCase()} {p.orderId ?? "—"}
               <small>SL {p.stop} TP {p.takeProfit} · {p.thesis}</small>
             </div>
           ))}
@@ -199,7 +237,7 @@ export default function Page() {
       </section>
       <p className="footer">
         Stock perps are discovered live from Bitget UTA v3. rToken (RAAPLUSDT) is spot, not a future.
-        Missing data is NO TRADE. Simulation is never labeled live.
+        Missing data is NO TRADE. Execution requires Bitget credentials — paper routes to Demo (paptrading:1), live routes live. No fills are ever fabricated.
       </p>
     </main>
   );

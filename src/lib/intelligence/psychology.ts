@@ -1,6 +1,13 @@
 import type { Psychology } from "../types";
 import { clamp } from "../util";
 
+/**
+ * Behavioral-state heuristic. `score` is a deterministic 0..100 index derived
+ * from price/funding/flow inputs (RSI, funding, 24h change, book imbalance,
+ * volume) — NOT text/news/social sentiment analysis. It is a crowding/regime
+ * proxy, carries the lowest confidence weight in the engine, and should be read
+ * as "how stretched is positioning," not "what is the market's mood."
+ */
 export interface PsychologySnapshot {
   state: Psychology;
   score: number;
@@ -22,7 +29,8 @@ export function psychologySnapshot(args: {
   score += (imbalance - 0.5) * 20;
   if (volumeRatio > 1.8) score += change24h > 0 ? 6 : -6;
   // The terms above are individually unbounded (funding and 24h change have no
-  // fixed range), so pin the sentiment score to a real 0..100 scale.
+  // fixed range), so pin this behavioral index to a real 0..100 scale. This is
+  // a positioning/crowding proxy, not a text-sentiment score.
   score = clamp(score, 0, 100);
 
   let state: Psychology = "neutral";

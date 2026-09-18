@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { sleep } from "../util";
 
 /**
  * Official Bitget UTA v3 + documented Demo header.
@@ -65,7 +66,59 @@ export async function bitgetPost<T>(
   return request<T>("POST", path, body, cfg);
 }
 
+/**
+ * Deterministic UTA v3 signature: base64(HMAC-SHA256(secret, ts+method+path+body)).
+ * The prehash order (timestamp + method + signPath + body) is exactly what
+ * Bitget verifies — reordering it silently breaks every authenticated call, so
+ * it is extracted here to be unit-locked. `path` must already include the query
+ * string for GETs (the signed path and the requested path are identical).
+ */
+export function signRequest(args: {
+  apiSecret: string;
+  timestamp: string;
+  method: "GET" | "POST";
+  path: string;
+  body?: string;
+}): string {
+  const prehash = args.timestamp + args.method + args.path + (args.body ?? "");
+  return createHmac("sha256", args.apiSecret).update(prehash).digest("base64");
+}
+
+/** HTTP statuses worth a retry: gateway/transient server + rate limit. */
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+function isTransient(err: unknown): boolean {
+  if (err instanceof BitgetError) return RETRYABLE_STATUS.has(err.status);
+  // fetch network failures and AbortError timeouts are not BitgetError — treat
+  // them as transient (only GETs are ever retried, so this cannot double-fill).
+  return true;
+}
+
 async function request<T>(
+  method: "GET" | "POST",
+  pathAndQuery: string,
+  body: unknown,
+  cfg: BitgetConfig,
+): Promise<T> {
+  // Only idempotent reads are retried. Order placement (POST) is NEVER
+  // auto-resent — even though clientOid would dedupe server-side, we refuse to
+  // gamble on a double-submit and let write callers handle failures explicitly.
+  const maxAttempts = method === "GET" ? 3 : 1;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await requestOnce<T>(method, pathAndQuery, body, cfg);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === maxAttempts || !isTransient(err)) throw err;
+      // Exponential backoff with light jitter: ~200ms, ~400ms.
+      await sleep(Math.round(200 * 2 ** (attempt - 1) * (1 + Math.random() * 0.25)));
+    }
+  }
+  throw lastErr;
+}
+
+async function requestOnce<T>(
   method: "GET" | "POST",
   pathAndQuery: string,
   body: unknown,
@@ -79,11 +132,14 @@ async function request<T>(
   };
 
   if (cfg.apiKey && cfg.apiSecret && cfg.passphrase) {
-    const signPath = pathAndQuery;
-    const prehash = timestamp + method + signPath + bodyStr;
-    const sign = createHmac("sha256", cfg.apiSecret).update(prehash).digest("base64");
     headers["ACCESS-KEY"] = cfg.apiKey;
-    headers["ACCESS-SIGN"] = sign;
+    headers["ACCESS-SIGN"] = signRequest({
+      apiSecret: cfg.apiSecret,
+      timestamp,
+      method,
+      path: pathAndQuery,
+      body: bodyStr,
+    });
     headers["ACCESS-TIMESTAMP"] = timestamp;
     headers["ACCESS-PASSPHRASE"] = cfg.passphrase;
     if (cfg.paper) headers.paptrading = "1";
@@ -107,7 +163,20 @@ async function request<T>(
         pathAndQuery,
       );
     }
-    const json = JSON.parse(text) as { code?: string; msg?: string; data?: T };
+    let json: { code?: string; msg?: string; data?: T };
+    try {
+      json = JSON.parse(text) as { code?: string; msg?: string; data?: T };
+    } catch {
+      // A 2xx carrying a non-JSON body (gateway/HTML error page, truncated
+      // response) must not surface as an opaque SyntaxError from deep in the
+      // stack. Fail loudly as a BitgetError with the raw text for diagnosis.
+      throw new BitgetError(
+        `Bitget returned a non-JSON body ${method} ${pathAndQuery}`,
+        res.status,
+        text.slice(0, 2000),
+        pathAndQuery,
+      );
+    }
     if (json.code && json.code !== "00000") {
       throw new BitgetError(
         `Bitget ${json.code}: ${json.msg ?? "error"}`,
